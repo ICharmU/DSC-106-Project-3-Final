@@ -1,0 +1,16 @@
+html, body{
+    height:100%;
+    margin:0;
+    font-family:Arial,Helvetica,sans-serif;
+}
+
+#map, /* covers case where #map is the <svg> itself */
+#map svg /* covers case where #map is a container and contains an <svg> */
+{
+    display: block;
+    width: 100%;
+    max-width: 1200px;
+    height: auto;
+    margin: 18px auto;
+    box-sizing: border-box;
+}

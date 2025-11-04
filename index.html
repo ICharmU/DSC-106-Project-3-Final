@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Home</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="tester4.js" type="module"></script>
+</head>
+<body>
+  <div id="controls" style="max-width:1200px;margin:12px auto;text-align:center;">
+  <label for="year-slider">Year: <span id="year-value">1990</span></label>
+  <input id="year-slider" type="range" min="1990" max="2020" step="1" value="1990" style="vertical-align:middle;margin-left:8px;">
+  <button id="play-btn" type="button" aria-label="Play animation" style="vertical-align:middle;margin-left:8px;padding:6px 10px;">Play ▶</button>
+    <div id="legend-row" style="display:flex;justify-content:center;gap:6px;margin-top:8px;"></div>
+  </div>
+  <svg id="map" aria-label="World map (D3)"></svg>
+</body>
+</html>
