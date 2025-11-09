@@ -20,6 +20,11 @@ const container = d3.select('#map');
 const width = 960;
 const height = 600;
 
+// extra blank space (in screen pixels) allowed inside the SVG viewport
+// This padding gives the map room to translate so arc animations that
+// target countries near the SVG edge can complete without being clipped.
+const VIEW_PADDING = 200;
+
 // If the #map element is already an <svg>, reuse it; otherwise append one.
 let svg;
 if (container.node() && container.node().nodeName && container.node().nodeName.toLowerCase() === 'svg') {
@@ -53,6 +58,10 @@ const projection = d3.geoNaturalEarth1()
   .translate([width / 2, height / 2]);
 
 const path = d3.geoPath().projection(projection);
+
+  // Base marker radius in screen pixels. Used to keep marker visual size
+  // constant regardless of d3.zoom scale (we set circle r = BASE_MARKER_RADIUS / k).
+  const BASE_MARKER_RADIUS = 3;
 
 // GeoJSON source (public). If you prefer a local copy, download and point here.
 const worldGeoUrl = 'https://raw.githubusercontent.com/holtzy/D3-graph-gallery/master/DATA/world.geojson';
@@ -152,6 +161,22 @@ async function drawMap() {
       .attr('fill-opacity', 1)
       .attr('stroke', '#555')
       .attr('stroke-width', 0.3)
+      .on('click', function (event, d) {
+        // Animate (or instant) zoom to any clicked country. We remember the
+        // last clicked feature for the reset animation. Respect the user's
+        // prefers-reduced-motion setting and fall back to instant zoom when set.
+        try {
+          lastClickedFeature = d;
+          const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+          if (prefersReduced) {
+            zoomToFeature(d);
+          } else {
+            animateZoomToFeature(d, 2000, 3);
+          }
+        } catch (e) {
+          console.warn('zoom-to-feature failed:', e && e.message);
+        }
+      })
       .on('mouseover', function (event, d) {
         d3.select(this).attr('stroke-width', 0.8);
         // lookup population
@@ -181,6 +206,510 @@ async function drawMap() {
         d3.select(this).attr('stroke-width', 0.3);
         tip.style('display', 'none');
       });
+
+  // helpers to manage a temporary red highlight on a country path.
+  // We save the current fill into a `data-prev-fill` attribute so we
+  // can restore it later when the highlight is cleared.
+  function clearCountryHighlight() {
+    countryPaths.each(function () {
+      const el = d3.select(this);
+      const prev = el.attr('data-prev-fill');
+      if (prev) {
+        el.attr('fill', prev);
+        el.attr('data-prev-fill', null);
+      }
+    });
+  }
+
+  function highlightCountry(f) {
+    if (!f) return;
+    // clear existing highlight first
+    clearCountryHighlight();
+    // find the DOM path corresponding to the feature and save/override fill
+    const sel = countryPaths.filter(d => d === f);
+    sel.each(function () {
+      const el = d3.select(this);
+      el.attr('data-prev-fill', el.attr('fill'));
+      el.attr('fill', '#d62728');
+    });
+  }
+
+  // last clicked feature (used by reset animation)
+  let lastClickedFeature = null;
+
+  // Helper: detect if a GeoJSON feature is in (or roughly belongs to) North America.
+      // This tries properties first, then falls back to a geographic bbox on the
+      // feature centroid so it still works with GeoJSON that lacks a continent field.
+      function isNorthAmericaFeature(f) {
+        if (!f || !f.properties) return false;
+        const p = f.properties || {};
+        const kont = (p.continent || p.CONTINENT || p.cont || p.region || p.REGION || '') + '';
+        if (kont.toLowerCase().includes('north') && kont.toLowerCase().includes('america')) return true;
+        const sub = (p.subregion || p.SUBREGION || p.sub || '') + '';
+        const region = (p.region_un || p.REGION_UN || p.region || p.REGION || '') + '';
+        if (sub.toLowerCase().includes('northern') && (region.toLowerCase().includes('america') || region.toLowerCase().includes('americas'))) return true;
+
+        // Fallback: check geographic centroid lon/lat against a rough North America bbox.
+        // Rough bounds: longitudes approx -170 .. -20, latitudes approx 5 .. 83
+        try {
+          const c = d3.geoCentroid(f);
+          if (!c || !isFinite(c[0]) || !isFinite(c[1])) return false;
+          const lon = c[0];
+          const lat = c[1];
+          if (lon >= -170 && lon <= -20 && lat >= 5 && lat <= 83) return true;
+        } catch (e) {
+          return false;
+        }
+        return false;
+      }
+
+      // Helper: instantly set the zoom transform so the given feature's centroid
+      // is centered in the viewport at a chosen scale. No animation/transition.
+      function zoomToFeature(f, targetK = 3) {
+        // Determine screen centroid (projection -> pixel coords used by path)
+        const c = path.centroid(f);
+        if (!c || !isFinite(c[0]) || !isFinite(c[1])) return;
+        const cx = c[0];
+        const cy = c[1];
+        // Compute translate so centroid lands in the center of the SVG
+        let tx = (width / 2) - targetK * cx;
+        let ty = (height / 2) - targetK * cy;
+        // Clamp transform so map remains covering viewport
+        const clamped = clampTransform({ x: tx, y: ty, k: targetK });
+        // Apply transform immediately (no transition)
+        svg.call(zoom.transform, d3.zoomIdentity.translate(clamped.x, clamped.y).scale(clamped.k));
+      }
+
+      // Animated zoom: draw a bottom semicircular arc from SVG center to the
+      // feature centroid and move the map along that arc over `duration` ms.
+      // The animation follows the bottom side of a circle connecting the two
+      // points. Uses requestAnimationFrame for a smooth 60fps update and a
+      // cubic ease-in-out. If the path is degenerate, falls back to instant zoom.
+      function animateZoomToFeature(f, duration = 2000, targetK = 3) {
+        const curT = d3.zoomTransform(svg.node());
+        // start point = center of SVG in screen coords
+        const sx = width / 2;
+        const sy = height / 2;
+        // feature centroid in map coordinates
+        const cent = path.centroid(f);
+        if (!cent || !isFinite(cent[0]) || !isFinite(cent[1])) {
+          zoomToFeature(f, targetK);
+          return;
+        }
+        // convert feature centroid to screen coords under current transform
+        const fx = curT.x + curT.k * cent[0];
+        const fy = curT.y + curT.k * cent[1];
+        const dx = fx - sx;
+        const dy = fy - sy;
+        const dlen = Math.hypot(dx, dy);
+        if (dlen < 0.5) {
+          zoomToFeature(f, targetK);
+          return;
+        }
+
+        // Build a cubic Bezier between center and destination. For features
+        // near the left/right edges (first/last 10% of width) use a straight
+        // line (collinear control points); otherwise build a bulging curve
+        // whose direction (up/down) is chosen based on the feature bbox.
+        const p0 = { x: sx, y: sy };
+        const p3 = { x: fx, y: fy };
+        let c1, c2;
+          // 10%-edge behavior removed per request; always use the standard
+          // bulging semicircle animation behavior.
+          const nearEdge = false;
+        if (nearEdge) {
+          // collinear control points produce an (effectively) straight line
+          c1 = { x: sx + dx * 0.33, y: sy + dy * 0.33 };
+          c2 = { x: sx + dx * 0.66, y: sy + dy * 0.66 };
+        } else {
+          // perpendicular vector to chord (in screen coords)
+          let perp = { x: -dy, y: dx };
+          const toScreen = (p) => ({ x: curT.x + curT.k * p[0], y: curT.y + curT.k * p[1] });
+          let wantPerpPositive;
+          try {
+            const b = path.bounds(f); // [[x0,y0],[x1,y1]] in projection/map coords
+            const topS = toScreen([b[0][0], b[0][1]]).y;
+            const bottomS = toScreen([b[1][0], b[1][1]]).y;
+            // if bottom is in bottom half, we want an upward bulge (so wantPerpPositive=false)
+            wantPerpPositive = (bottomS <= (height / 2));
+          } catch (e) {
+            // fallback to using centroid screen y
+            wantPerpPositive = (fy <= (height / 2));
+          }
+          if (wantPerpPositive) {
+            if (perp.y < 0) { perp.x *= -1; perp.y *= -1; }
+          } else {
+            if (perp.y > 0) { perp.x *= -1; perp.y *= -1; }
+          }
+          const plen = Math.hypot(perp.x, perp.y) || 1;
+          perp.x /= plen; perp.y /= plen;
+          // control point offset proportional to distance
+          const offset = Math.min(0.9 * dlen, dlen * 0.6);
+          const mid = { x: (sx + fx) / 2, y: (sy + fy) / 2 };
+          c1 = { x: mid.x - dx * 0.25 + perp.x * offset, y: mid.y - dy * 0.25 + perp.y * offset };
+          c2 = { x: mid.x + dx * 0.25 + perp.x * offset, y: mid.y + dy * 0.25 + perp.y * offset };
+        }
+
+        // append overlay path to svg (not inside g so it doesn't get transformed)
+        const overlay = svg.append('g').attr('class', 'zoom-overlay');
+        const curve = overlay.append('path')
+          .attr('d', `M ${p0.x},${p0.y} C ${c1.x},${c1.y} ${c2.x},${c2.y} ${p3.x},${p3.y}`)
+          .attr('fill', 'none')
+          .attr('stroke', '#333')
+          .attr('stroke-width', 2)
+          .attr('stroke-linecap', 'round')
+          .attr('stroke-linejoin', 'round')
+          .attr('opacity', 0.95);
+
+        // animate stroke drawing using stroke-dasharray
+        const totalLen = curve.node().getTotalLength();
+        curve.attr('stroke-dasharray', totalLen + ' ' + totalLen).attr('stroke-dashoffset', totalLen);
+  // ensure overlay stroke draws for the full animation duration
+  curve.transition().duration(duration).ease(d3.easeCubicOut).attr('stroke-dashoffset', 0);
+
+        // Schedule highlight fade sequence:
+        // - start fading in the red highlight 0.5s before the zoom animation ends
+        // - keep fully red for 1s after the zoom ends
+        // - fade out over 0.5s and then restore the original fill
+  const HIGHLIGHT_FADEOUT_MS = 500;
+  const FLASH_MS = 300; // bright orange flash duration after animation ends
+    // start the flash exactly when the animation ends (no prior red fade)
+    const fadeInDelay = Math.max(0, duration);
+        let highlightTimers = [];
+        // helper to start the color-transition sequence for the clicked country
+        // (transition fill from its current value -> red -> back to original)
+        function startHighlightFadeSequence(feature) {
+          try {
+            const sel = countryPaths.filter(d => d === feature);
+            if (sel.empty()) return;
+            // save previous fill on each matched element so we can restore later
+            sel.each(function () {
+              const el = d3.select(this);
+              const prevFill = el.attr('fill') || '';
+              el.attr('data-prev-fill', prevFill);
+            });
+
+            // start orange flash immediately (at animation end)
+            const tOrange = setTimeout(() => {
+              try {
+                const selO = countryPaths.filter(d => d === feature);
+                selO.each(function () {
+                  const el = d3.select(this);
+                  // immediately set to bright orange for the flash (no transition)
+                  el.attr('fill', '#ff7f0e'); // D3 category10 orange (bright)
+                });
+              } catch (e) { /* non-fatal */ }
+            }, 0);
+            highlightTimers.push(tOrange);
+
+            // after orange flash duration, transition back to saved fill
+            const tBack = setTimeout(() => {
+              try {
+                const sel2 = countryPaths.filter(d => d === feature);
+                sel2.each(function () {
+                  const el = d3.select(this);
+                  const prev = el.attr('data-prev-fill') || '';
+                  // transition back to previous fill color
+                  el.transition().duration(HIGHLIGHT_FADEOUT_MS).attr('fill', prev).on('end', function () {
+                    // cleanup saved attribute when done
+                    d3.select(this).attr('data-prev-fill', null);
+                  });
+                });
+              } catch (e) { /* non-fatal */ }
+            }, FLASH_MS);
+            highlightTimers.push(tBack);
+          } catch (e) {
+            // non-fatal
+          }
+        }
+        const fadeInTimer = setTimeout(() => startHighlightFadeSequence(f), fadeInDelay);
+        highlightTimers.push(fadeInTimer);
+
+        // cubic Bezier evaluator
+        function cubicAt(t, p0, p1, p2, p3) {
+          const u = 1 - t;
+          const tt = t * t;
+          const uu = u * u;
+          const uuu = uu * u;
+          const ttt = tt * t;
+          return {
+            x: uuu * p0.x + 3 * uu * t * p1.x + 3 * u * tt * p2.x + ttt * p3.x,
+            y: uuu * p0.y + 3 * uu * t * p1.y + 3 * u * tt * p2.y + ttt * p3.y
+          };
+        }
+
+        const ease = d3.easeCubicInOut;
+        const startK = curT.k;
+        const startTime = performance.now();
+  // For near-edge straight-line animations we previously froze the
+  // view after 1s. Per user request, expand that view interval to 2s
+  // and slow the view-frame so it progresses only half as far over
+  // that interval (half the velocity) while the overlay still runs
+  // for the full `duration` (keeps total animation visually 2s).
+  const freezeMs = 2000;
+        let frozenClamped = null;
+
+        let rafId = null;
+        function step(now) {
+          const elapsed = now - startTime;
+          const t = Math.max(0, Math.min(1, elapsed / duration));
+          const et = ease(t);
+          // point along curve in screen coords used for overlay (full-duration)
+          const ptOverlay = cubicAt(et, p0, c1, c2, p3);
+          // For near-edge straight-line animations we animate the view-frame
+          // only during the first `freezeMs` interval; the overlay continues
+          // for the full `duration`. Compute separate eased parameters for
+          // view vs overlay.
+          const viewDuration = nearEdge ? Math.min(freezeMs, duration) : duration;
+          const tv = Math.max(0, Math.min(1, elapsed / viewDuration));
+          // Base eased progress for view-frame
+          let ev = ease(tv);
+          // For near-edge case, slow view progress to half the distance
+          // over the viewDuration (i.e. half the velocity). Overlay still
+          // uses full eased progress (et) across `duration`.
+          if (nearEdge) ev *= 0.5;
+
+          // point for view-frame (may be frozen after viewDuration)
+          const ptView = nearEdge ? cubicAt(ev, p0, c1, c2, p3) : ptOverlay;
+          const kView = startK + (targetK - startK) * (nearEdge ? ev : et);
+          // translate so ptView becomes centered
+          let tx = (width / 2) - kView * ( (ptView.x - curT.x) / curT.k );
+          let ty = (height / 2) - kView * ( (ptView.y - curT.y) / curT.k );
+          const clamped = clampTransform({ x: tx, y: ty, k: kView });
+
+          if (nearEdge && elapsed >= viewDuration) {
+            if (!frozenClamped) frozenClamped = clamped;
+            svg.call(zoom.transform, d3.zoomIdentity.translate(frozenClamped.x, frozenClamped.y).scale(frozenClamped.k));
+          } else {
+            svg.call(zoom.transform, d3.zoomIdentity.translate(clamped.x, clamped.y).scale(clamped.k));
+          }
+
+          if (elapsed < duration) {
+            rafId = requestAnimationFrame(step);
+          } else {
+            // tidy up overlay after a short delay so stroke animation can finish
+            window.setTimeout(() => {
+              overlay.remove();
+              // highlight is managed by the scheduled fade sequence; do not
+              // set it here to avoid duplicate timing.
+            }, 300);
+            rafId = null;
+          }
+        }
+
+        rafId = requestAnimationFrame(step);
+        // return a cancel function in case caller wants to stop it
+        return () => {
+          try { if (rafId) cancelAnimationFrame(rafId); } catch (e) {}
+          try { overlay.remove(); } catch (e) {}
+          // clear any scheduled highlight timers
+          try {
+            highlightTimers.forEach(t => clearTimeout(t));
+            if (typeof fadeInTimer !== 'undefined') clearTimeout(fadeInTimer);
+          } catch (e) {}
+          // interrupt any running transitions and restore saved fills
+          try {
+            countryPaths.interrupt();
+            countryPaths.each(function () {
+              const el = d3.select(this);
+              const prev = el.attr('data-prev-fill');
+              if (prev) el.attr('fill', prev);
+              el.attr('data-prev-fill', null);
+            });
+          } catch (e) {}
+        };
+      }
+
+      // Animate reset in reverse: map the semicircle from the unzoomed map
+      // (center -> feature centroid in map coordinates) and then animate the
+      // zoom transform from the current transform back to the identity while
+      // following the bottom side of that semicircle in reverse.
+      function animateResetToGlobal(f, duration = 2000, targetK = 1) {
+        const curT = d3.zoomTransform(svg.node());
+        // map coords for unzoomed center and feature centroid
+        const p0_map = [width / 2, height / 2];
+        const p3_map = path.centroid(f);
+        if (!p3_map || !isFinite(p3_map[0]) || !isFinite(p3_map[1])) {
+          // fallback to simple transition
+          svg.transition().duration(600).call(zoom.transform, d3.zoomIdentity);
+          return;
+        }
+
+        // build control points in map coordinates
+        const dx = p3_map[0] - p0_map[0];
+        const dy = p3_map[1] - p0_map[1];
+        // helper: map map-coords to screen-coords using current transform
+        const toScreen = (p) => ({ x: curT.x + curT.k * p[0], y: curT.y + curT.k * p[1] });
+  // 10%-edge behaviour removed; always use the mapped semicircle
+  // reverse animation when resetting.
+  const p3s_test = toScreen(p3_map);
+  const nearEdge = false;
+        let c1_map, c2_map;
+        if (nearEdge) {
+          // collinear control points in map coords -> straight-line animation
+          c1_map = { x: p0_map[0] + dx * 0.33, y: p0_map[1] + dy * 0.33 };
+          c2_map = { x: p0_map[0] + dx * 0.66, y: p0_map[1] + dy * 0.66 };
+        } else {
+          let perp = { x: -dy, y: dx };
+          let wantPerpPositive;
+          try {
+            const b = path.bounds(f); // [[x0,y0],[x1,y1]] in projection coords
+            const topS = toScreen([b[0][0], b[0][1]]).y;
+            const bottomS = toScreen([b[1][0], b[1][1]]).y;
+            wantPerpPositive = (bottomS <= (height / 2));
+          } catch (e) {
+            const p3s_fallback = toScreen(p3_map);
+            wantPerpPositive = (p3s_fallback.y <= (height / 2));
+          }
+          if (wantPerpPositive) {
+            if (perp.y < 0) { perp.x *= -1; perp.y *= -1; }
+          } else {
+            if (perp.y > 0) { perp.x *= -1; perp.y *= -1; }
+          }
+          const plen = Math.hypot(perp.x, perp.y) || 1;
+          perp.x /= plen; perp.y /= plen;
+          const dlen = Math.hypot(dx, dy) || 1;
+          const offset = Math.min(0.9 * dlen, dlen * 0.6);
+          const mid = { x: (p0_map[0] + p3_map[0]) / 2, y: (p0_map[1] + p3_map[1]) / 2 };
+          c1_map = { x: mid.x - dx * 0.25 + perp.x * offset, y: mid.y - dy * 0.25 + perp.y * offset };
+          c2_map = { x: mid.x + dx * 0.25 + perp.x * offset, y: mid.y + dy * 0.25 + perp.y * offset };
+        }
+
+  // overlay drawn in screen coords (use current transform to map map-coords)
+        let p0s = toScreen(p0_map);
+        let c1s = toScreen([c1_map.x, c1_map.y]);
+        let c2s = toScreen([c2_map.x, c2_map.y]);
+        let p3s = toScreen(p3_map);
+
+        // If near-edge, override and draw a straight screen-space line from
+        // the country (current screen pos) to the global center. Use
+        // collinear control points so the path is effectively straight.
+        if (nearEdge) {
+          // start at country screen position
+          p0s = toScreen(p3_map);
+          // end at SVG center in screen coords
+          p3s = { x: width / 2, y: height / 2 };
+          c1s = { x: p0s.x + (p3s.x - p0s.x) * 0.33, y: p0s.y + (p3s.y - p0s.y) * 0.33 };
+          c2s = { x: p0s.x + (p3s.x - p0s.x) * 0.66, y: p0s.y + (p3s.y - p0s.y) * 0.66 };
+        }
+
+        const overlay = svg.append('g').attr('class', 'zoom-overlay');
+        const curve = overlay.append('path')
+          .attr('d', `M ${p0s.x},${p0s.y} C ${c1s.x},${c1s.y} ${c2s.x},${c2s.y} ${p3s.x},${p3s.y}`)
+          .attr('fill', 'none')
+          .attr('stroke', '#333')
+          .attr('stroke-width', 2)
+          .attr('stroke-linecap', 'round')
+          .attr('stroke-linejoin', 'round')
+          .attr('opacity', 0.95);
+
+        const totalLen = curve.node().getTotalLength();
+        curve.attr('stroke-dasharray', totalLen + ' ' + totalLen).attr('stroke-dashoffset', totalLen);
+  // ensure overlay stroke draws for the full animation duration
+  curve.transition().duration(duration).ease(d3.easeCubicOut).attr('stroke-dashoffset', 0);
+
+        function cubicAtMap(t, p0, p1, p2, p3) {
+          const u = 1 - t;
+          const tt = t * t;
+          const uu = u * u;
+          const uuu = uu * u;
+          const ttt = tt * t;
+          return {
+            x: uuu * p0[0] + 3 * uu * t * p1.x + 3 * u * tt * p2.x + ttt * p3[0],
+            y: uuu * p0[1] + 3 * uu * t * p1.y + 3 * u * tt * p2.y + ttt * p3[1]
+          };
+        }
+
+        // cubic evaluator for screen-space points (objects with x,y)
+        function cubicAtScreen(t, p0, p1, p2, p3) {
+          const u = 1 - t;
+          const tt = t * t;
+          const uu = u * u;
+          const uuu = uu * u;
+          const ttt = tt * t;
+          return {
+            x: uuu * p0.x + 3 * uu * t * p1.x + 3 * u * tt * p2.x + ttt * p3.x,
+            y: uuu * p0.y + 3 * uu * t * p1.y + 3 * u * tt * p2.y + ttt * p3.y
+          };
+        }
+
+  const ease = d3.easeCubicInOut;
+  const startK = curT.k;
+  const startTime = performance.now();
+  // expand the view interval and slow the view progress (half velocity)
+  const freezeMs = 2000;
+        let frozenClamped = null;
+
+        let rafId = null;
+        function step(now) {
+          const elapsed = now - startTime;
+          const t = Math.max(0, Math.min(1, elapsed / duration));
+          const et = ease(t);
+          // evaluate overlay point. For near-edge we use the straight
+          // screen-space curve (p0s->p3s); otherwise evaluate the mapped
+          // unzoomed semicircle in map coordinates and map to screen.
+          let pt_map_overlay = null;
+          let pt_screen_overlay = null;
+          if (nearEdge) {
+            pt_screen_overlay = cubicAtScreen(1 - et, p0s, c1s, c2s, p3s);
+          } else {
+            pt_map_overlay = cubicAtMap(1 - et, p0_map, c1_map, c2_map, p3_map); // reverse path (map coords)
+          }
+          // For near-edge resets, animate the view-frame only during the
+          // first freezeMs; overlay follows full duration. Compute separate
+          // eased parameters.
+          const viewDuration = nearEdge ? Math.min(freezeMs, duration) : duration;
+          const tv = Math.max(0, Math.min(1, elapsed / viewDuration));
+          let ev = ease(tv);
+          if (nearEdge) ev *= 0.5;
+
+          // compute view-point. For near-edge use screen-space path and map
+          // it into the transform equation; otherwise use map-space pt.
+          let kView = startK + (targetK - startK) * (nearEdge ? ev : et);
+          let tx, ty;
+          if (nearEdge) {
+            // To avoid bias when unzooming from edge countries, interpolate
+            // the transform parameters directly toward the identity transform
+            // (k=1, x=0, y=0). This reliably returns the map to the global
+            // centered view without depending on screen->map projections
+            // that can produce side-biased results.
+            const tInv = ev; // ev already respects the half-velocity scaling
+            const interpX = curT.x + (0 - curT.x) * tInv;
+            const interpY = curT.y + (0 - curT.y) * tInv;
+            const interpK = startK + (targetK - startK) * tInv;
+            // compute clamped values so we don't slip off-canvas
+            const clampedInterp = clampTransform({ x: interpX, y: interpY, k: interpK });
+            tx = clampedInterp.x;
+            ty = clampedInterp.y;
+            kView = clampedInterp.k;
+          } else {
+            const pt_map_view = pt_map_overlay; // already in map coords for non-nearEdge
+            tx = (width / 2) - kView * pt_map_view.x;
+            ty = (height / 2) - kView * pt_map_view.y;
+          }
+          const clamped = clampTransform({ x: tx, y: ty, k: kView });
+          if (nearEdge && elapsed >= viewDuration) {
+            if (!frozenClamped) frozenClamped = clamped;
+            svg.call(zoom.transform, d3.zoomIdentity.translate(frozenClamped.x, frozenClamped.y).scale(frozenClamped.k));
+          } else {
+            svg.call(zoom.transform, d3.zoomIdentity.translate(clamped.x, clamped.y).scale(clamped.k));
+          }
+
+          if (elapsed < duration) {
+            rafId = requestAnimationFrame(step);
+          } else {
+            window.setTimeout(() => {
+              overlay.remove();
+              // clearing any highlight because we're returning to global view
+              try { clearCountryHighlight(); } catch (e) { /* non-fatal */ }
+            }, 300);
+            rafId = null;
+          }
+        }
+
+        rafId = requestAnimationFrame(step);
+        return () => { if (rafId) cancelAnimationFrame(rafId); overlay.remove(); };
+      }
 
       // helper: parse slider and selected year
       const yearSlider = d3.select('#year-slider');
@@ -786,10 +1315,20 @@ async function drawMap() {
         const circles = pointsLayer.selectAll('circle.event-dot')
           .data(points, (d) => d.id ?? d.iso3 ?? d.__idx);
 
+  // current zoom scale so we can set a radius that visually remains
+  // constant on-screen regardless of the group's scale. Use square-root
+  // scaling so radius decreases proportional to sqrt(k) rather than a
+  // full linear factor. This provides a gentler reduction when zooming.
+  const curK = d3.zoomTransform(svg.node()).k || 1;
+
         circles.join(
           enter => enter.append('circle')
             .attr('class', 'event-dot')
-            .attr('r', 3)
+            // store a logical base radius (screen pixels) and set the actual
+            // SVG radius inversely to the current zoom so the on-screen size
+            // remains the BASE_MARKER_RADIUS
+            .attr('data-base-r', BASE_MARKER_RADIUS)
+            .attr('r', BASE_MARKER_RADIUS / Math.sqrt(curK))
             .attr('fill', d => disasterColor(d))
             .attr('stroke', '#fff')
             .attr('stroke-width', 0)
@@ -811,8 +1350,10 @@ async function drawMap() {
               const yr = d.year ?? 'N/A';
               const geo = d.geolocation ?? d.Geolocation ?? d.location ?? 'Unknown location';
               const dtype = d.disastertype ?? d.disaster_type ?? d.disasterType ?? 'Unknown';
+              // try common country field names in the CSV rows
+              const countryName = (d.country || d.Country || d.country_name || d.CountryName || d['country_name'] || d['Country'] || d['country']) ?? 'Unknown';
               tip.style('display', 'block')
-                .html(`<strong>${dtype}</strong><br>Year: ${yr}<br>Location: ${geo}<br>Coords: ${d.lat.toFixed(3)}, ${d.lon.toFixed(3)}`);
+                .html(`<strong>${dtype}</strong><br>Year: ${yr}<br>Country: ${countryName}<br>Location: ${geo}<br>Coords: ${d.lat.toFixed(3)}, ${d.lon.toFixed(3)}`);
             })
             .on('mousemove', function (event) {
               tip.style('left', (event.pageX + 12) + 'px')
@@ -836,12 +1377,16 @@ async function drawMap() {
               const op = Math.max(0, Math.min(1, 1 - age * decay));
               return op;
             })
+            // update radius to compensate for current zoom so marker remains
+            // visually constant in screen space
+            .attr('r', BASE_MARKER_RADIUS / Math.sqrt(curK))
             .on('mouseover', function (event, d) {
               const yr = d.year ?? 'N/A';
               const geo = d.geolocation ?? d.Geolocation ?? d.location ?? 'Unknown location';
               const dtype = d.disastertype ?? d.disaster_type ?? d.disasterType ?? 'Unknown';
+              const countryName = (d.country || d.Country || d.country_name || d.CountryName || d['country_name'] || d['Country'] || d['country']) ?? 'Unknown';
               tip.style('display', 'block')
-                .html(`<strong>${dtype}</strong><br>Year: ${yr}<br>Location: ${geo}<br>Coords: ${d.lat.toFixed(3)}, ${d.lon.toFixed(3)}`);
+                .html(`<strong>${dtype}</strong><br>Year: ${yr}<br>Country: ${countryName}<br>Location: ${geo}<br>Coords: ${d.lat.toFixed(3)}, ${d.lon.toFixed(3)}`);
             })
             .on('mousemove', function (event) {
               tip.style('left', (event.pageX + 12) + 'px')
@@ -867,10 +1412,12 @@ async function drawMap() {
       function clampTransform(t) {
         const k = t.k;
         // allowed translation range so content covers the viewport
-        const minX = Math.min(0, width - width * k);
-        const maxX = 0;
-        const minY = Math.min(0, height - height * k);
-        const maxY = 0;
+        // Allow an extra VIEW_PADDING margin on all sides so the map can
+        // be translated further and reveal blank space inside the SVG.
+        const minX = Math.min(0, width - width * k) - VIEW_PADDING;
+        const maxX = VIEW_PADDING;
+        const minY = Math.min(0, height - height * k) - VIEW_PADDING;
+        const maxY = VIEW_PADDING;
         const x = Math.max(minX, Math.min(maxX, t.x));
         const y = Math.max(minY, Math.min(maxY, t.y));
         return { x, y, k };
@@ -895,9 +1442,80 @@ async function drawMap() {
           const t = event.transform;
           const c = clampTransform(t);
           g.attr('transform', `translate(${c.x},${c.y}) scale(${c.k})`);
+
+          // Adjust event marker radii so their on-screen size remains
+          // constant regardless of the group's scale. Circles are children of
+          // `g`, so they are affected by the group's scale; to compensate,
+          // set each circle's `r` to BASE_MARKER_RADIUS / currentScale.
+          try {
+            const currentK = c.k || 1;
+            // apply sqrt scaling when updating during zoom
+            g.selectAll('circle.event-dot').attr('r', BASE_MARKER_RADIUS / Math.sqrt(currentK));
+          } catch (e) {
+            // non-fatal: if svg isn't ready or selection fails, skip
+          }
         });
 
       svg.call(zoom);
+
+      // Add a simple zoom-reset control under the SVG.
+      // We place the control in the same container that holds the SVG; if
+      // the `#map` element itself is the SVG, we append the control to the
+      // SVG's parent so the button can be rendered in HTML/CSS.
+      try {
+        const mapContainerEl = container.node();
+        const controlsParent = (mapContainerEl && mapContainerEl.nodeName && mapContainerEl.nodeName.toLowerCase() === 'svg')
+          ? d3.select(mapContainerEl.parentNode)
+          : container;
+
+        let controls = controlsParent.select('.map-controls');
+        if (controls.empty()) {
+          controls = controlsParent.append('div')
+            .attr('class', 'map-controls')
+            .style('display', 'flex')
+            .style('justify-content', 'center')
+            .style('margin-top', '8px');
+        }
+
+        // create or reuse the reset button
+        let resetBtn = controls.select('#zoom-reset-btn');
+        if (resetBtn.empty()) {
+          resetBtn = controls.append('button')
+            .attr('id', 'zoom-reset-btn')
+            .attr('type', 'button')
+            .attr('aria-label', 'Reset zoom to global view')
+            .style('padding', '6px 10px')
+            .style('border-radius', '4px')
+            .style('border', '1px solid #bbb')
+            .style('background', '#fff')
+            .style('cursor', 'pointer')
+            .style('font-size', '13px')
+            .text('Reset Zoom ⤺');
+
+          resetBtn.on('click', () => {
+            const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            const identity = d3.zoomIdentity;
+            if (prefersReduced) {
+              svg.call(zoom.transform, identity);
+            } else {
+                // if we have a last-clicked country, animate the reset following
+                // the bottom-side semicircle mapped from the unzoomed map to the
+                // current country (reverse of the zoom-in). Otherwise, do a
+                // simple animated reset.
+                if (lastClickedFeature) {
+                  // animate reset over 2000ms following reverse path
+                  animateResetToGlobal(lastClickedFeature, 2000, 1);
+                } else {
+                  // animate reset transform over 600ms as fallback
+                  svg.transition().duration(600).call(zoom.transform, identity);
+                }
+            }
+          });
+        }
+      } catch (e) {
+        // non-fatal: controls are UX nicety; log for debugging
+        console.warn('failed to create zoom controls:', e && e.message);
+      }
 
     console.log('World map drawn');
   } catch (err) {
