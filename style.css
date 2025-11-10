@@ -1,7 +1,11 @@
 html, body{
     height:100%;
     margin:0;
-    font-family:Arial,Helvetica,sans-serif;
+    /* modern system stack fallback, Inter as primary */
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    color: #222;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 #map, /* covers case where #map is the <svg> itself */
@@ -13,4 +17,55 @@ html, body{
     height: auto;
     margin: 18px auto;
     box-sizing: border-box;
+}
+
+/* Header styling: increase size and center */
+h1 {
+    text-align: center;
+    /* simpler, professional sans for headings */
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+    font-size: 2.2rem; /* prominent but not overly stylized */
+    margin: 18px 12px 12px 12px;
+    line-height: 1.12;
+    font-weight: 700;
+    letter-spacing: 0; /* neutral spacing */
+}
+
+/* Writeup/link area: center below the SVG and align to the same max width */
+body > div {
+    width: 100%;
+    max-width: 1200px; /* match svg container width */
+    margin: 8px auto 24px auto;
+    text-align: center;
+    box-sizing: border-box;
+}
+
+/* Style the writeup link: remove underline and inherit color */
+body > div h2 a {
+    text-decoration: none;
+    color: #0b3d91; /* subtle professional blue */
+    font-weight: 600;
+    transition: color 160ms ease;
+}
+
+body > div h2 a:hover,
+body > div h2 a:focus {
+    color: #062a66;
+}
+
+/* D3 tooltip: size to content, wrap long lines, limit maximum width */
+.d3-tooltip {
+    display: inline-block; /* shrink to fit content */
+    width: auto;
+    max-width: min(90vw, 520px); /* never wider than viewport or 520px */
+    white-space: normal; /* allow wrapping */
+    word-break: break-word;
+    box-sizing: border-box;
+}
+
+/* Small screen adjustments */
+@media (max-width: 480px) {
+    h1 { font-size: 1.6rem; margin: 12px 8px; }
+    body > div { margin-top: 10px; }
+    body > div h2 a { font-size: 1rem; }
 }
