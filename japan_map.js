@@ -44,6 +44,28 @@ async function renderJapanMap(opts = {}) {
       .style('border-radius', '4px');
   }
 
+  // Optionally crop the bottom portion by reducing the SVG viewBox height.
+  // opts.clipBottomPercent (number 0-100) controls how much to cut off from bottom.
+  const clipBottom = (typeof opts.clipBottomPercent === 'number') ? Math.max(0, Math.min(100, opts.clipBottomPercent)) : 10; // default 10%
+  const visibleHeight = Math.max(0, Math.round(height * (1 - clipBottom / 100)));
+
+  // Update the SVG viewBox so the container and its border match the cropped area.
+  // We compute projection using the full original height so features keep positions,
+  // then crop by shrinking the viewBox height — content below visibleHeight will be omitted.
+  try {
+    svg.attr('viewBox', `0 0 ${width} ${visibleHeight}`)
+       .attr('preserveAspectRatio', 'xMidYMid meet')
+       .style('aspect-ratio', `${width} / ${visibleHeight}`);
+    // If clipping was applied, reduce the displayed width so the post-clipped image
+    // doesn't appear too large. Use opts.postClipWidth (string, e.g. '75%') if provided,
+    // otherwise default to 75% when clipping is active.
+    const postClipWidth = (typeof opts.postClipWidth === 'string') ? opts.postClipWidth : (clipBottom > 0 ? '75%' : '100%');
+    svg.style('width', opts.responsive === false ? `${width}px` : postClipWidth);
+  } catch (e) {
+    // If setting aspect-ratio via style fails, still set viewBox and preserveAspectRatio.
+    svg.attr('viewBox', `0 0 ${width} ${visibleHeight}`).attr('preserveAspectRatio', 'xMidYMid meet');
+  }
+
   const g = svg.append('g').attr('class', 'map-group');
 
   const tip = d3.select('body').append('div')
@@ -229,7 +251,11 @@ async function renderJapanMap(opts = {}) {
 // Auto-run when loaded directly in the browser (module script include)
 if (typeof window !== 'undefined') {
   // call and catch to avoid unhandled promise rejections
-  renderJapanMap().catch(err => console.error('renderJapanMap error:', err));
+  const opts = {
+    clipBottomPercent: 10,
+    postClipWidth: "60%",
+  };
+  renderJapanMap(opts).catch(err => console.error('renderJapanMap error:', err));
 }
 
 // Export for module environments

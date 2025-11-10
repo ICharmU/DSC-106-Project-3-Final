@@ -8,13 +8,18 @@ html, body{
     -moz-osx-font-smoothing: grayscale;
 }
 
+.map-group {
+    padding: auto;
+}
+
 #map, /* covers case where #map is the <svg> itself */
 #map svg /* covers case where #map is a container and contains an <svg> */
 {
     display: block;
     width: 100%;
     max-width: 1200px;
-    height: auto;
+    aspect-ratio: 12 / 7;
+    height: auto; /* let aspect-ratio determine height */
     margin: 18px auto;
     box-sizing: border-box;
 }
