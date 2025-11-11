@@ -55,64 +55,6 @@ function attachPrefectureHandlers() {
 
 		const prefTooltip = d3.select('#' + prefTipId);
 
-		// Precompute statistics for each prefecture to avoid repeated geoContains calls on hover.
-		// Build a map keyed by a stable id stored on feature.properties.__prefTooltipId.
-		const prefStatsMap = new Map();
-		try {
-			const points = d3.selectAll('circle.disaster-point').data() || [];
-			prefs.nodes().forEach((node, i) => {
-				const feat = d3.select(node).datum();
-				if (!feat) return;
-				const props = feat.properties = feat.properties || {};
-				const id = props.__prefTooltipId ?? (`pref-${i}`);
-				props.__prefTooltipId = id;
-				const matches = [];
-				if (typeof d3.geoContains === 'function') {
-					for (const p of points) {
-						if (!p) continue;
-						const lon = +p.longitude;
-						const lat = +p.latitude;
-						if (isNaN(lon) || isNaN(lat)) continue;
-						try {
-							if (d3.geoContains(feat, [lon, lat])) matches.push(p);
-						} catch (e) {
-							// ignore geometry issues
-						}
-					}
-				}
-				// Aggregate stats
-				const totalDeaths = matches.reduce((acc, p) => {
-					const raw = p.deaths ?? p.death ?? 0;
-					const n = Number(raw);
-					return acc + (isNaN(n) ? 0 : n);
-				}, 0);
-				const totalAffected = matches.reduce((acc, p) => {
-					const raw = p.affected ?? p.affect ?? 0;
-					const n = Number(raw);
-					return acc + (isNaN(n) ? 0 : n);
-				}, 0);
-				const years = matches.map(p => {
-					const raw = p.year ?? p.event_year ?? '';
-					const y = Number(raw);
-					return isNaN(y) ? null : Math.trunc(y);
-				}).filter(y => y != null);
-				const hasValidYear = years.length > 0;
-				const minYear = hasValidYear ? Math.min(...years) : null;
-				const maxYear = hasValidYear ? Math.max(...years) : null;
-				const repPrefName = matches.length > 0 ? (matches[0].prefecture || matches[0].prefecture_norm || matches[0].pref_name || matches[0].location_str || matches[0].location || null) : null;
-				prefStatsMap.set(id, {
-					totalDeaths,
-					totalAffected,
-					eventCount: matches.length,
-					hasValidYear,
-					minYear,
-					maxYear,
-					repPrefName
-				});
-			});
-		} catch (e) {
-			// if precomputation fails, prefStatsMap stays empty and hover falls back to on-demand checks
-		}
 
 		prefs
 				.on(enter + '.prefTooltip', function (event, d) {
@@ -175,10 +117,12 @@ function attachPrefectureHandlers() {
 					let totalAffected = 0;
 					let eventCount = 0;
 					let yearRangeText = 'N/A';
+					let hasValidYear = false;
 					if (stats) {
 						totalDeaths = stats.totalDeaths;
 						totalAffected = stats.totalAffected;
 						eventCount = stats.eventCount;
+						hasValidYear = !!stats.hasValidYear;
 						if (stats.hasValidYear) {
 							yearRangeText = (stats.minYear === stats.maxYear) ? String(stats.minYear) : `${stats.minYear}–${stats.maxYear}`;
 						}
@@ -204,9 +148,12 @@ function attachPrefectureHandlers() {
 							const minY = Math.min(...years);
 							const maxY = Math.max(...years);
 							yearRangeText = (minY === maxY) ? String(minY) : `${minY}–${maxY}`;
+							hasValidYear = true;
 						}
 					}
 
+					// Attach hasValidYear as a data attribute for external use, then show summary statistics
+					prefTooltip.attr('data-has-valid-year', hasValidYear ? 'true' : 'false');
 					// Only show summary statistics: totals, year range, and event count.
 					if (eventCount === 0) {
 						prefTooltip.html(`<strong>${title}</strong><div style="margin-top:6px;color:#ddd">No recorded disasters in dataset</div>`).style('display', 'block');
