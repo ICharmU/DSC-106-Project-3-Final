@@ -166,56 +166,6 @@ async function renderJapanMap(opts = {}) {
     console.warn('Failed to draw prefecture boundaries:', e.message);
   }
 
-  // Load and render disaster data points
-  try {
-    const disasterData = await d3.csv('./data/gdis_emdat_japan_prefecture_merged_enh.csv');
-    
-    // Filter out rows with missing coordinates
-    const validData = disasterData.filter(d => 
-      d.latitude && d.longitude && 
-      !isNaN(+d.latitude) && !isNaN(+d.longitude)
-    );
-    
-    console.log(`Loaded ${validData.length} disaster events with valid coordinates`);
-    
-    // Add red dots for each disaster location
-    const dots = g.selectAll('circle.disaster-point')
-      .data(validData)
-      .join('circle')
-      .attr('class', 'disaster-point')
-      .attr('cx', d => projection([+d.longitude, +d.latitude])[0])
-      .attr('cy', d => projection([+d.longitude, +d.latitude])[1])
-      .attr('r', 3)
-      .attr('fill', 'red')
-      .attr('stroke', 'darkred')
-      .attr('stroke-width', 0.5)
-      .attr('opacity', 0.7)
-      .style('cursor', 'pointer')
-      .on('mouseover', function(event, d) {
-        d3.select(this).attr('r', 5).attr('opacity', 1);
-        const tooltipText = `
-          <strong>${d.disaster_type_gdis || 'Disaster'}</strong><br/>
-          Location: ${d.location_str || 'Unknown'}<br/>
-          Prefecture: ${d.prefecture || 'Unknown'}<br/>
-          Year: ${d.year || 'Unknown'}<br/>
-          Deaths: ${d.deaths || '0'}<br/>
-          Affected: ${d.total_affected || '0'}
-        `;
-        tip.style('display', 'block').html(tooltipText);
-      })
-      .on('mousemove', function(event) {
-        tip.style('left', (event.pageX + 12) + 'px').style('top', (event.pageY + 12) + 'px');
-      })
-      .on('mouseout', function() {
-        d3.select(this).attr('r', 3).attr('opacity', 0.7);
-        tip.style('display', 'none');
-      });
-      
-    console.log('Disaster points rendered');
-  } catch (e) {
-    console.warn('Failed to load or render disaster data:', e.message);
-  }
-
   // Zoom functionality disabled to keep fixed frame of view
 
   // Reset control removed since zoom functionality is disabled
