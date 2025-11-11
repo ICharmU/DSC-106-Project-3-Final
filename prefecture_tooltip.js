@@ -55,6 +55,65 @@ function attachPrefectureHandlers() {
 
 		const prefTooltip = d3.select('#' + prefTipId);
 
+		// Precompute statistics for each prefecture to avoid repeated geoContains calls on hover.
+		// Build a map keyed by a stable id stored on feature.properties.__prefTooltipId.
+		const prefStatsMap = new Map();
+		try {
+			const points = d3.selectAll('circle.disaster-point').data() || [];
+			prefs.nodes().forEach((node, i) => {
+				const feat = d3.select(node).datum();
+				if (!feat) return;
+				const props = feat.properties = feat.properties || {};
+				const id = props.__prefTooltipId ?? (`pref-${i}`);
+				props.__prefTooltipId = id;
+				const matches = [];
+				if (typeof d3.geoContains === 'function') {
+					for (const p of points) {
+						if (!p) continue;
+						const lon = +p.longitude;
+						const lat = +p.latitude;
+						if (isNaN(lon) || isNaN(lat)) continue;
+						try {
+							if (d3.geoContains(feat, [lon, lat])) matches.push(p);
+						} catch (e) {
+							// ignore geometry issues
+						}
+					}
+				}
+				// Aggregate stats
+				const totalDeaths = matches.reduce((acc, p) => {
+					const raw = p.deaths ?? p.death ?? 0;
+					const n = Number(raw);
+					return acc + (isNaN(n) ? 0 : n);
+				}, 0);
+				const totalAffected = matches.reduce((acc, p) => {
+					const raw = p.affected ?? p.affect ?? 0;
+					const n = Number(raw);
+					return acc + (isNaN(n) ? 0 : n);
+				}, 0);
+				const years = matches.map(p => {
+					const raw = p.year ?? p.event_year ?? '';
+					const y = Number(raw);
+					return isNaN(y) ? null : Math.trunc(y);
+				}).filter(y => y != null);
+				const hasValidYear = years.length > 0;
+				const minYear = hasValidYear ? Math.min(...years) : null;
+				const maxYear = hasValidYear ? Math.max(...years) : null;
+				const repPrefName = matches.length > 0 ? (matches[0].prefecture || matches[0].prefecture_norm || matches[0].pref_name || matches[0].location_str || matches[0].location || null) : null;
+				prefStatsMap.set(id, {
+					totalDeaths,
+					totalAffected,
+					eventCount: matches.length,
+					hasValidYear,
+					minYear,
+					maxYear,
+					repPrefName
+				});
+			});
+		} catch (e) {
+			// if precomputation fails, prefStatsMap stays empty and hover falls back to on-demand checks
+		}
+
 		prefs
 				.on(enter + '.prefTooltip', function (event, d) {
 					// hide global tooltip
@@ -64,74 +123,94 @@ function attachPrefectureHandlers() {
 					const props = feat && feat.properties ? feat.properties : {};
 					const prefName = props.__engName || props.name_en || props.prefecture || props.pref_name || props.name || '';
 
-					// Gather disaster points and test whether they fall inside this prefecture feature
-					let points = [];
+					// Retrieve precomputed stats for this prefecture if available to avoid recalculation
+					let stats = null;
 					try {
-						// d3.selectAll(...).data() returns array of bound data objects
-						points = d3.selectAll('circle.disaster-point').data() || [];
+						const id = feat && feat.properties ? feat.properties.__prefTooltipId : null;
+						if (id && typeof prefStatsMap !== 'undefined' && prefStatsMap.has(id)) {
+							stats = prefStatsMap.get(id);
+						}
 					} catch (e) {
-						points = [];
+						stats = null;
 					}
 
-					const matches = [];
-					if (feat && typeof d3.geoContains === 'function') {
-						for (const p of points) {
-							if (!p) continue;
-							const lon = +p.longitude;
-							const lat = +p.latitude;
-							if (isNaN(lon) || isNaN(lat)) continue;
-							try {
-								if (d3.geoContains(feat, [lon, lat])) {
-									matches.push(p);
+					// Fallback: if precomputation wasn't possible, compute matches on demand
+					let matches = [];
+					if (!stats) {
+						try {
+							const points = d3.selectAll('circle.disaster-point').data() || [];
+							if (feat && typeof d3.geoContains === 'function') {
+								for (const p of points) {
+									if (!p) continue;
+									const lon = +p.longitude;
+									const lat = +p.latitude;
+									if (isNaN(lon) || isNaN(lat)) continue;
+									try {
+										if (d3.geoContains(feat, [lon, lat])) matches.push(p);
+									} catch (e) {
+										// ignore geometry errors
+									}
 								}
-							} catch (e) {
-								// ignore geometry errors
 							}
+						} catch (e) {
+							matches = [];
 						}
 					}
 
 					// Build tooltip content
-					// If prefName is generic, prefer the first matched disaster's prefecture property as the title
+					// If prefName is generic, prefer a representative matched disaster's prefecture property as the title
 					let title = prefName;
-					if ((title === 'Prefecture' || !title) && matches.length > 0) {
-						const first = matches[0];
-						title = first.prefecture || first.prefecture_norm || first.pref_name || first.location_str || first.location || title;
+					if ((title === 'Prefecture' || !title)) {
+						if (stats && stats.repPrefName) {
+							title = stats.repPrefName;
+						} else if (matches.length > 0) {
+							const first = matches[0];
+							title = first.prefecture || first.prefecture_norm || first.pref_name || first.location_str || first.location || title;
+						}
 					}
 
-					// Compute total deaths for the prefecture, treating non-numeric (NaN/empty) as 0
+					// Compute and display statistics. Prefer precomputed `stats` when available
 					const fmt = new Intl.NumberFormat();
-					const totalDeaths = matches.reduce((acc, p) => {
-						const raw = p.deaths ?? p.death ?? 0;
-						const n = Number(raw);
-						return acc + (isNaN(n) ? 0 : n);
-					}, 0);
-
-					// Compute total affected similarly
-					const totalAffected = matches.reduce((acc, p) => {
-						const raw = p.affected ?? p.affect ?? 0;
-						const n = Number(raw);
-						return acc + (isNaN(n) ? 0 : n);
-					}, 0);
-
-					// Compute year range (min and max) from matched events. Ignore non-numeric years.
-					const years = matches.map(p => {
-						const raw = p.year ?? p.event_year ?? '';
-						const y = Number(raw);
-						return isNaN(y) ? null : Math.trunc(y);
-					}).filter(y => y != null);
+					let totalDeaths = 0;
+					let totalAffected = 0;
+					let eventCount = 0;
 					let yearRangeText = 'N/A';
-					if (years.length > 0) {
-						const minY = Math.min(...years);
-						const maxY = Math.max(...years);
-						// Use an en-dash for ranges (e.g., 1960–2018). If all events are the same year show single year.
-						yearRangeText = (minY === maxY) ? String(minY) : `${minY}–${maxY}`;
+					if (stats) {
+						totalDeaths = stats.totalDeaths;
+						totalAffected = stats.totalAffected;
+						eventCount = stats.eventCount;
+						if (stats.hasValidYear) {
+							yearRangeText = (stats.minYear === stats.maxYear) ? String(stats.minYear) : `${stats.minYear}–${stats.maxYear}`;
+						}
+					} else {
+						// fallback to on-demand computation if precomputation wasn't available
+						totalDeaths = matches.reduce((acc, p) => {
+							const raw = p.deaths ?? p.death ?? 0;
+							const n = Number(raw);
+							return acc + (isNaN(n) ? 0 : n);
+						}, 0);
+						totalAffected = matches.reduce((acc, p) => {
+							const raw = p.affected ?? p.affect ?? 0;
+							const n = Number(raw);
+							return acc + (isNaN(n) ? 0 : n);
+						}, 0);
+						eventCount = matches.length;
+						const years = matches.map(p => {
+							const raw = p.year ?? p.event_year ?? '';
+							const y = Number(raw);
+							return isNaN(y) ? null : Math.trunc(y);
+						}).filter(y => y != null);
+						if (years.length > 0) {
+							const minY = Math.min(...years);
+							const maxY = Math.max(...years);
+							yearRangeText = (minY === maxY) ? String(minY) : `${minY}–${maxY}`;
+						}
 					}
 
 					// Only show summary statistics: totals, year range, and event count.
-					if (matches.length === 0) {
+					if (eventCount === 0) {
 						prefTooltip.html(`<strong>${title}</strong><div style="margin-top:6px;color:#ddd">No recorded disasters in dataset</div>`).style('display', 'block');
 					} else {
-						const eventCount = matches.length;
 						// Center each statistic line individually. Use simple centered divs
 						// with a bullet character so each line is horizontally centered.
 						const statsHtml = `
