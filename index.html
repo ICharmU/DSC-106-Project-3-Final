@@ -9,11 +9,39 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Merriweather:wght@300;400;700&display=swap" rel="stylesheet">
   <script src="japan_map.js" type="module" defer></script>
   <script src="prefecture_tooltip.js" type="module" defer></script>
+  <script src="slider_filter.js" type="module" defer></script>
 </head>
 <body>
   <h1>
-    How do prefecture's risk profiles change in relation to natural disasters?
+    How do prefectures' risk profiles change in relation to natural disasters?
   </h1>
+  <div class="slidecontainer">
+        <button id="prevButton">prev</button>
+        <input type="range" min="1960" max="2018" value="1960" class="slider" id="myRange">
+        <button id="nextButton">next</button>
+        <button id="autoplay">play</button>
+        <p>Year: <span id="demo"></span></p>
+  </div>
+  <div class="textcontainer">
+    <input type="text" id="myTextBox" placeholder="Enter a year">
+    <button id="myButton">Submit</button>
+  </div>
+  <div class="disasters">
+    <input type="checkbox" id="Drought" name="Drought" checked />
+    <label for="Drought">Drought</label>
+    <input type="checkbox" id="Earthquake" name="Earthquake" checked />
+    <label for="Earthquake">Earthquake</label>
+    <input type="checkbox" id="ExtremeTemperature" name="ExtremeTemperature" checked />
+    <label for="ExtremeTemperature">Extreme Temperature</label>
+    <input type="checkbox" id="Flood" name="Flood" checked />
+    <label for="Flood">Flood</label>
+    <input type="checkbox" id="Landslide" name="Landslide" checked />
+    <label for="Landslide">Landslide</label>
+    <input type="checkbox" id="Storm" name="Storm" checked />
+    <label for="Storm">Storm</label>
+    <input type="checkbox" id="VolcanicActivity" name="VolcanicActivity" checked />
+    <label for="VolcanicActivity">Volcanic Activity</label>
+  </div>
   <svg id="map" aria-label="World map (D3)"></svg>
   <div>
     <h2><a href="./writeup.html">Writeup (click here)</a></h2>
