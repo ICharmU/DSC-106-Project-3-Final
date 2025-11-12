@@ -158,8 +158,8 @@ const volcanoCheck = document.getElementById('VolcanicActivity');
 
 slider.oninput = function() {
     autoplay = false;
-    output.innerHTML = this.value;
-    year = this.value;
+    output.innerHTML = parseInt(this.value);
+    year = parseInt(this.value);
     renderDisasterPoints(year);
 };
 
