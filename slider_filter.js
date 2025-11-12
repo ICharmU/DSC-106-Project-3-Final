@@ -125,6 +125,13 @@ function autoplayYears() {
             output.innerHTML = year;
             slider.value = year;
             renderDisasterPoints(year);
+            // If a pointer position is available, update prefecture tooltip to reflect
+            // whatever the user is currently hovering over (useful during autoplay).
+            try {
+                if (typeof window.__prefShowTooltipAtPointer === 'function') window.__prefShowTooltipAtPointer();
+            } catch (e) {
+                // ignore
+            }
             if (forward) {
                 year += 1;
             }
