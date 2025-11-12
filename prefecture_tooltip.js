@@ -197,15 +197,22 @@ window.__prefHideTooltip = function () {
 
 			// Compute and display statistics. Prefer precomputed `stats` when available
 			const fmt = new Intl.NumberFormat();
+			const fmtCurrency = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
 			let totalDeaths = 0;
-			let totalAffected = 0;
+			let totalAffected = 0; // kept for internal use but not shown as 'Total Affected'
+			let totalInjured = 0;
+			let totalHomeless = 0;
+			let totalDamageUsd = 0;
 			let eventCount = 0;
 			let yearRangeText = 'N/A';
 			let hasValidYear = false;
 			if (stats) {
-				totalDeaths = stats.totalDeaths;
-				totalAffected = stats.totalAffected;
-				eventCount = stats.eventCount;
+				totalDeaths = stats.totalDeaths || 0;
+				totalAffected = stats.totalAffected || 0;
+				totalInjured = stats.totalInjured || 0;
+				totalHomeless = stats.totalHomeless || 0;
+				totalDamageUsd = stats.totalDamageUsd || 0;
+				eventCount = stats.eventCount || 0;
 				hasValidYear = !!stats.hasValidYear;
 				if (stats.hasValidYear) {
 					yearRangeText = (stats.minYear === stats.maxYear) ? String(stats.minYear) : `${stats.minYear}–${stats.maxYear}`;
@@ -218,7 +225,22 @@ window.__prefHideTooltip = function () {
 					return acc + (isNaN(n) ? 0 : n);
 				}, 0);
 				totalAffected = matches.reduce((acc, p) => {
-					const raw = p.affected ?? p.affect ?? 0;
+					const raw = p.affected ?? p.total_affected ?? p.affect ?? 0;
+					const n = Number(raw);
+					return acc + (isNaN(n) ? 0 : n);
+				}, 0);
+				totalInjured = matches.reduce((acc, p) => {
+					const raw = p.injured ?? 0;
+					const n = Number(raw);
+					return acc + (isNaN(n) ? 0 : n);
+				}, 0);
+				totalHomeless = matches.reduce((acc, p) => {
+					const raw = p.homeless ?? 0;
+					const n = Number(raw);
+					return acc + (isNaN(n) ? 0 : n);
+				}, 0);
+				totalDamageUsd = matches.reduce((acc, p) => {
+					const raw = (p.damage_final_usd ?? p.damage_final ?? p.damage_adj_usd) ?? 0;
 					const n = Number(raw);
 					return acc + (isNaN(n) ? 0 : n);
 				}, 0);
@@ -246,8 +268,11 @@ window.__prefHideTooltip = function () {
 				// with a bullet character so each line is horizontally centered.
 				const statsHtml = `
 					<div style="margin-top:6px;color:#ffd">
-						<div style="text-align:center;margin:6px 0">• Total deaths: ${fmt.format(totalDeaths)}</div>
-						<div style="text-align:center;margin:6px 0">• Total affected: ${fmt.format(totalAffected)}</div>
+						<div style="text-align:center;margin:6px 0">• Affected: ${fmt.format(totalAffected)}</div>
+						<div style="text-align:center;margin:6px 0">• Injured: ${fmt.format(totalInjured)}</div>
+						<div style="text-align:center;margin:6px 0">• Homeless: ${fmt.format(totalHomeless)}</div>
+						<div style="text-align:center;margin:6px 0">• Deaths: ${fmt.format(totalDeaths)}</div>
+						<div style="text-align:center;margin:6px 0">• Damage (USD): ${fmtCurrency.format(totalDamageUsd)}</div>
 						<div style="text-align:center;margin:6px 0">• Year: ${yearRangeText}</div>
 						<div style="text-align:center;margin:6px 0">• Disasters: ${eventCount}</div>
 					</div>`;

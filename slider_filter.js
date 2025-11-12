@@ -106,13 +106,25 @@ function renderDisasterPoints(year) {
         .style('cursor', 'pointer')
         .on('mouseover', function(event, d) {
             d3.select(this).attr('r', 5).attr('opacity', 1);
+            // format numbers for readability
+            const fmt = new Intl.NumberFormat();
+            const fmtCurrency = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+            const deaths = d.deaths ?? d.death ?? '';
+            const affected = d.affected ?? d.total_affected ?? d.affect ?? '';
+            const injured = d.injured ?? '';
+            const homeless = d.homeless ?? '';
+            const damageUsd = (d.damage_final_usd ?? d.damage_final) ?? d.damage_adj_usd ?? '';
+
             const tooltipText = `
             <strong>${d.disaster_type_gdis || 'Disaster'}</strong><br/>
             Location: ${d.location_str || 'Unknown'}<br/>
             Prefecture: ${d.prefecture || 'Unknown'}<br/>
             Year: ${d.year || 'Unknown'}<br/>
-            Deaths: ${d.deaths || '0'}<br/>
-            Affected: ${d.total_affected || '0'}
+            Affected: ${affected !== '' ? fmt.format(Number(affected)) : 'N/A'}<br/>
+            Injured: ${injured !== '' ? fmt.format(Number(injured)) : 'N/A'}<br/>
+            Homeless: ${homeless !== '' ? fmt.format(Number(homeless)) : 'N/A'}<br/>
+            Deaths: ${deaths !== '' ? fmt.format(Number(deaths)) : 'N/A'}<br/>
+            Damage (USD): ${damageUsd !== '' ? fmtCurrency.format(Number(damageUsd)) : 'N/A'}
             `;
             tip.style('display', 'block').html(tooltipText);
         })
