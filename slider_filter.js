@@ -165,6 +165,7 @@ const volcanoCheck = document.getElementById('VolcanicActivity');
 
 slider.oninput = function() {
     autoplay = false;
+    autoplayButton.textContent = 'play';
     output.innerHTML = parseInt(this.value);
     year = parseInt(this.value);
     renderDisasterPoints(year);
@@ -172,6 +173,7 @@ slider.oninput = function() {
 
 prevButton.addEventListener('click', function() {
     autoplay = false;
+    autoplayButton.textContent = 'play';
     if (year != 1960) {
         year -= 1;
         slider.value = year;
@@ -182,6 +184,7 @@ prevButton.addEventListener('click', function() {
 
 nextButton.addEventListener('click', function() {
     autoplay = false;
+    autoplayButton.textContent = 'play';
     if (year != 2018) {
         year += 1;
         slider.value = year;
@@ -194,6 +197,7 @@ myButton.addEventListener('click', function() {
     const textValue = parseInt(myTextBox.value);
     if (!isNaN(textValue) && textValue >= 1960 && textValue <= 2018) {
         autoplay = false;
+        autoplayButton.textContent = 'play';
         slider.value = textValue;
         output.innerHTML = textValue;
         year = textValue;
@@ -205,6 +209,10 @@ autoplayButton.addEventListener('click', function() {
     autoplay = !autoplay;
     if (autoplay) {
         autoplayYears();
+        autoplayButton.textContent = 'pause';
+    }
+    else {
+        autoplayButton.textContent = 'play';
     }
 });
 
