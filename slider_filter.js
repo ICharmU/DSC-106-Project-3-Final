@@ -25,6 +25,8 @@ const g = d3.select("g.map-group");
 
 const tip = d3.select('.d3-tooltip');
 
+
+
 // Load Japan prefectures GeoJSON from the specified URL
 const japanPrefecturesUrl = 'https://raw.githubusercontent.com/dataofjapan/land/master/japan.geojson';
   
@@ -39,6 +41,26 @@ try {
     console.error('Failed to load Japan prefectures GeoJSON:', err);
     svg.append('text').attr('x', 20).attr('y', 40).text('Failed to load Japan GeoJSON. See console.');
 }
+
+//assign color
+const color = d3.scaleOrdinal().domain(disasters)
+.range(d3.schemeTableau10); 
+
+//color code checkboxes
+document.querySelectorAll('.disaster-item input').forEach(input => {
+  const disaster = input.id.toLowerCase(); // match your disasters array
+  const box = input.nextElementSibling;    // the <span> custom checkbox
+  box.style.backgroundColor = color(disaster.toLowerCase());
+
+  // Toggle color on click
+  input.addEventListener('change', () => {
+    if (input.checked) {
+      box.style.backgroundColor = color(disaster.toLowerCase()); // colored
+    } else {
+      box.style.backgroundColor = 'white'; // unchecked = white
+    }
+  });
+});
 
 // projection + path. Use fitSize to compute a scale that fits the features
 const projection = d3.geoMercator();
@@ -77,8 +99,8 @@ function renderDisasterPoints(year) {
         .attr('cx', d => projection([+d.longitude, +d.latitude])[0])
         .attr('cy', d => projection([+d.longitude, +d.latitude])[1])
         .attr('r', 3)
-        .attr('fill', 'red')
-        .attr('stroke', 'darkred')
+        .attr('fill', d => color(d.disaster_type_gdis))
+        .attr('stroke', d => d3.color(color(d.disaster_type_gdis)).darker(1))
         .attr('stroke-width', 0.5)
         .attr('opacity', 0.7)
         .style('cursor', 'pointer')
@@ -144,6 +166,7 @@ function autoplayYears() {
 }
 
 renderDisasterPoints(year);
+
 
 var slider = document.getElementById("myRange");
 var output = document.getElementById("demo");

@@ -74,3 +74,37 @@ body > div h2 a:focus {
     body > div { margin-top: 10px; }
     body > div h2 a { font-size: 1rem; }
 }
+
+
+.disaster-item input {
+  position: absolute;
+  opacity: 0;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.custom-checkbox {
+  width: 16px;
+  height: 16px;
+  display: inline-block;
+  margin-right: 6px;
+  border-radius: 3px;
+  border: 1px solid #999;
+  position: relative;
+  vertical-align: middle;
+}
+
+/* White checkmark when checked */
+.disaster-item input:checked + .custom-checkbox::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 5px;
+  width: 4px;
+  height: 8px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
