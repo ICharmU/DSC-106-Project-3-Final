@@ -147,6 +147,13 @@ function autoplayYears() {
             output.innerHTML = year;
             slider.value = year;
             renderDisasterPoints(year);
+            // If a pointer position is available, update prefecture tooltip to reflect
+            // whatever the user is currently hovering over (useful during autoplay).
+            try {
+                if (typeof window.__prefShowTooltipAtPointer === 'function') window.__prefShowTooltipAtPointer();
+            } catch (e) {
+                // ignore
+            }
             if (forward) {
                 year += 1;
             }
@@ -181,13 +188,15 @@ const volcanoCheck = document.getElementById('VolcanicActivity');
 
 slider.oninput = function() {
     autoplay = false;
-    output.innerHTML = this.value;
-    year = this.value;
+    autoplayButton.innerText = 'play';
+    output.innerHTML = parseInt(this.value);
+    year = parseInt(this.value);
     renderDisasterPoints(year);
 };
 
 prevButton.addEventListener('click', function() {
     autoplay = false;
+    autoplayButton.innerText = 'play';
     if (year != 1960) {
         year -= 1;
         slider.value = year;
@@ -198,6 +207,7 @@ prevButton.addEventListener('click', function() {
 
 nextButton.addEventListener('click', function() {
     autoplay = false;
+    autoplayButton.innerText = 'play';
     if (year != 2018) {
         year += 1;
         slider.value = year;
@@ -210,6 +220,7 @@ myButton.addEventListener('click', function() {
     const textValue = parseInt(myTextBox.value);
     if (!isNaN(textValue) && textValue >= 1960 && textValue <= 2018) {
         autoplay = false;
+        autoplayButton.innerText = 'play';
         slider.value = textValue;
         output.innerHTML = textValue;
         year = textValue;
@@ -221,6 +232,10 @@ autoplayButton.addEventListener('click', function() {
     autoplay = !autoplay;
     if (autoplay) {
         autoplayYears();
+        autoplayButton.innerText = 'pause';
+    }
+    else {
+        autoplayButton.innerText = 'play';
     }
 });
 
