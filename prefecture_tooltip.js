@@ -29,7 +29,7 @@ if (!document.getElementById(prefTipId)) {
 		.style('font-size', '13px')
 		.style('border-radius', '4px')
 		.style('display', 'none')
-		.style('z-index', 2000)
+		.style('z-index', '2147483647')
 		.style('max-width', '360px')
 		.style('white-space', 'normal');
 }
@@ -112,8 +112,6 @@ window.__prefHideTooltip = function () {
 
 		// Helper: compute stats for a prefecture feature/node and show the tooltip.
 		function computeAndShow(prefNode, event, d) {
-			// hide global tooltip
-			d3.select('body').classed(DISABLE_CLASS, true);
 			// prepare and show our prefecture tooltip listing disaster locations inside the polygon
 			const feat = (d && d.properties) ? d : (d3.select(prefNode).datum() ? d3.select(prefNode).datum() : null);
 			const props = feat && feat.properties ? feat.properties : {};
@@ -262,20 +260,26 @@ window.__prefHideTooltip = function () {
 			prefTooltip.attr('data-has-valid-year', hasValidYear ? 'true' : 'false');
 			// Only show summary statistics: totals, year range, and event count.
 			if (eventCount === 0) {
-				prefTooltip.html(`<strong>${title}</strong><div style="margin-top:6px;color:#ddd">No recorded disasters in dataset</div>`).style('display', 'block');
+				// When there are no matching disaster points, do not show the prefecture
+				// tooltip at all. Ensure the global (point) tooltip remains enabled.
+				d3.select('body').classed(DISABLE_CLASS, false);
+				prefTooltip.style('display', 'none').html('');
 			} else {
+				// When we do have matches, suppress the global tooltip so our
+				// prefecture tooltip is used instead.
+				d3.select('body').classed(DISABLE_CLASS, true);
 				// Center each statistic line individually. Use simple centered divs
 				// with a bullet character so each line is horizontally centered.
 				const statsHtml = `
-					<div style="margin-top:6px;color:#ffd">
-						<div style="text-align:center;margin:6px 0">• Affected: ${fmt.format(totalAffected)}</div>
-						<div style="text-align:center;margin:6px 0">• Injured: ${fmt.format(totalInjured)}</div>
-						<div style="text-align:center;margin:6px 0">• Homeless: ${fmt.format(totalHomeless)}</div>
-						<div style="text-align:center;margin:6px 0">• Deaths: ${fmt.format(totalDeaths)}</div>
-						<div style="text-align:center;margin:6px 0">• Damage (USD): ${fmtCurrency.format(totalDamageUsd)}</div>
-						<div style="text-align:center;margin:6px 0">• Year: ${yearRangeText}</div>
-						<div style="text-align:center;margin:6px 0">• Disasters: ${eventCount}</div>
-					</div>`;
+						<div style="margin-top:6px;color:#ffd">
+							<div style="text-align:center;margin:6px 0">• Affected: ${fmt.format(totalAffected)}</div>
+							<div style="text-align:center;margin:6px 0">• Injured: ${fmt.format(totalInjured)}</div>
+							<div style="text-align:center;margin:6px 0">• Homeless: ${fmt.format(totalHomeless)}</div>
+							<div style="text-align:center;margin:6px 0">• Deaths: ${fmt.format(totalDeaths)}</div>
+							<div style="text-align:center;margin:6px 0">• Damage (USD): ${fmtCurrency.format(totalDamageUsd)}</div>
+							<div style="text-align:center;margin:6px 0">• Year: ${yearRangeText}</div>
+							<div style="text-align:center;margin:6px 0">• Disasters: ${eventCount}</div>
+						</div>`;
 				prefTooltip.html(`<strong>${title}</strong>${statsHtml}`).style('display', 'block');
 			}
 		}

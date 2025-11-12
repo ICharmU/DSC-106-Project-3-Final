@@ -1,3 +1,4 @@
+
 import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 
 // japan_map.js
@@ -68,6 +69,8 @@ async function renderJapanMap(opts = {}) {
 
   const g = svg.append('g').attr('class', 'map-group');
 
+  // Create the global map tooltip element (used only when a prefecture
+  // contains at least one rendered disaster point).
   const tip = d3.select('body').append('div')
     .attr('class', 'd3-tooltip')
     .style('position', 'absolute')
@@ -136,14 +139,35 @@ async function renderJapanMap(opts = {}) {
         name = 'Prefecture';
       }
       
-      tip.style('display', 'block').html(`<strong>${name}</strong>`);
+        // Determine whether any rendered disaster-point circle is inside this
+        // prefecture by checking the DOM: for each circle, find its closest
+        // ancestor prefecture path and compare.
+        let hasEvents = false;
+        try {
+          const circles = document.querySelectorAll('circle.disaster-point');
+          for (const c of circles) {
+            try {
+              const pref = c.closest && c.closest('path.prefecture');
+              if (pref === this) { hasEvents = true; break; }
+            } catch (e) { /* ignore */ }
+          }
+        } catch (e) { hasEvents = false; }
+
+        if (!hasEvents) {
+          // explicit: no tooltip for polygons without events
+          tip.style('display', 'none');
+          return;
+        }
+
+        // Build and show tooltip (prefecture contains at least one disaster point)
+        tip.style('display', 'block').html(`<strong>${name}</strong>`);
     })
     .on('mousemove', function (event) {
-      tip.style('left', (event.pageX + 12) + 'px').style('top', (event.pageY + 12) + 'px');
+  tip.style('left', (event.pageX + 12) + 'px').style('top', (event.pageY + 12) + 'px');
     })
     .on('mouseout', function () {
       d3.select(this).attr('fill', '#f7f7f7');
-      tip.style('display', 'none');
+  tip.style('display', 'none');
     });
 
   // Draw prefecture boundaries using the already loaded data
