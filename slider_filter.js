@@ -25,6 +25,7 @@ const DISASTER_KEYS = [
 
 const disasterData = await d3.csv('./data/gdis_emdat_japan_prefecture_merged_enh.csv');
 let year = 1960;
+let isInitialLoad = true; // Flag to track if this is the first render
 
 const paletteDefault = {
   'drought': '#4E79A7',
@@ -155,22 +156,25 @@ function renderDisasterPoints(year) {
       .selectAll('circle.disaster-point')
       .data(validData, keyFn);
 
-    // ENTER: fade + grow
+    // ENTER: immediate display on initial load, transition on subsequent loads
     const dotsEnter = dots.enter()
       .append('circle')
       .attr('class', 'disaster-point')
       .attr('cx', d => projection([+d.longitude, +d.latitude])[0])
       .attr('cy', d => projection([+d.longitude, +d.latitude])[1])
-      .attr('r', 0)
+      .attr('r', isInitialLoad ? 3.5 : 0)
       .attr('fill', d => disasterColor(d.disaster_type_gdis))
       .attr('stroke', d => d3.color(disasterColor(d.disaster_type_gdis)).darker(1))
       .attr('stroke-width', 0.6)
-      .attr('opacity', 0)
-      .style('cursor', 'pointer')
-      .call(sel => sel.transition().duration(380)
+      .attr('opacity', isInitialLoad ? 0.9 : 0)
+      .style('cursor', 'pointer');
+
+    // Apply transition only if not initial load
+    if (!isInitialLoad) {
+      dotsEnter.transition().duration(380)
         .attr('opacity', 0.9)
-        .attr('r', 3.5)
-      );
+        .attr('r', 3.5);
+    }
 
     // UPDATE: gently move/recolor if needed
     dots.transition().duration(320)
@@ -220,6 +224,12 @@ function renderDisasterPoints(year) {
         d3.select(this).transition().duration(120).attr('r', 3.5).attr('opacity', 0.9);
         tip.style('display', 'none');
       });
+
+    // Mark initial load as complete
+    if (isInitialLoad) {
+      isInitialLoad = false;
+      console.log('Initial load complete - future renders will use transitions');
+    }
 
   } catch (e) {
     console.warn('Failed to load or render disaster data:', e.message);
@@ -454,3 +464,6 @@ volcanoCheck.addEventListener('click', function() {
 });
 
 gPoints.raise();
+
+// Initial render for starting year (1960)
+renderDisasterPoints(year);
