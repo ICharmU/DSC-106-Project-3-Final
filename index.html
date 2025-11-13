@@ -18,6 +18,18 @@
   <script src="japan_map.js" type="module" defer></script>
   <script src="slider_filter.js" type="module" defer></script>
   <script src="prefecture_tooltip.js" type="module" defer></script>
+
+  <!-- MathJax for LaTeX (lightweight async load) -->
+  <script>
+    window.MathJax = {
+      tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
+      svg: { fontCache: 'global' }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js"></script>
+  
+  <!-- Risk choropleth layer (new) -->
+  <script src="risk_profile.js" type="module" defer></script>
 </head>
 
 <body>

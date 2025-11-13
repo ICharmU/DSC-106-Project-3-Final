@@ -325,7 +325,7 @@ label {
 
 /* --- PREFECTURE HOVER VISUALS --- */
 .pref {
-    fill: #f9fbfd;
+    /* fill: #f9fbfd; */
     /* soft neutral */
     stroke: #888ea3;
     /* subtle border */
@@ -334,7 +334,7 @@ label {
 }
 
 .pref.hovered {
-    fill: #fff;
+    /* fill: #fff; */
     /* lift */
     stroke: #0b3d91;
     /* brandy-blue edge */
@@ -351,7 +351,7 @@ circle.disaster-point {
 /* --- PREFECTURE HOVER POP (applies to .prefecture and .pref) --- */
 .prefecture,
 .pref {
-    fill: #f9fbfd;
+    /* fill: #f9fbfd; */
     stroke: #888ea3;
     stroke-width: 0.6px;
     transition: fill 180ms ease, stroke 180ms ease, stroke-width 180ms ease, filter 180ms ease, opacity 180ms ease;
@@ -368,11 +368,71 @@ body.pref-hover-active .pref:not(.hovered) {
 /* The “pop”: thicker, darker border + soft glow, lift fill slightly */
 .prefecture.hovered,
 .pref.hovered {
-    fill: #ffffff;
+    /* fill: #ffffff; */
     /* subtle lift */
     stroke: #1d2a51;
     /* dark navy for contrast */
     stroke-width: 2.4px;
     /* thicker edge */
     filter: drop-shadow(0 1px 3px rgba(0, 0, 0, .28)) drop-shadow(0 0 6px rgba(13, 60, 145, .35));
+}
+
+/* Legend */
+#map-legend {
+    margin-top: 10px;
+    display: inline-flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.legend-row {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 4px;
+}
+
+.legend-bar {
+    height: 12px;
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid var(--rule);
+}
+
+.legend-bar>div {
+    height: 100%;
+    float: left;
+}
+
+.legend-ticks {
+    display: flex;
+    justify-content: space-between;
+    font-size: 11px;
+    color: var(--muted);
+}
+
+/* Detail section (scatter) */
+#detail-container {
+    position: relative;
+}
+
+#detail-svg {
+    min-height: 260px;
+}
+
+#detail-summary {
+    margin-top: 8px;
+}
+
+#formula-box {
+    margin-top: 10px;
+    padding: 10px;
+    background: #fafafa;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    font-size: 13px;
+}
+
+#formula-box h3 {
+    margin: 0 0 6px;
+    font-size: 14px;
 }
