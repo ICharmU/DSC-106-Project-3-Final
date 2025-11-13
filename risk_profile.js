@@ -312,6 +312,10 @@ function shadePrefectures(year) {
   });
 
   if (!pts.empty()) pts.raise();
+  
+  // Add hover handlers after shading prefectures
+  bindHoverHandlers();
+  
   console.log(`[risk_profile] shade ${year}: ${hits}/${total} joined (${misses} misses)`);
   if (misses) console.debug(`[risk_profile] sample misses ${year}:`, missList.slice(0, 8));
 }
@@ -486,6 +490,39 @@ function hookYearChanges() {
     const points = g.select("g.points");
     if (!points.empty()) points.raise();
   }, 180);
+}
+
+/** ---------- HOVER HANDLERS (preserve risk colors) ---------- **/
+function bindHoverHandlers() {
+  const g = d3.select("g.map-group");
+  g.selectAll("path.prefecture")
+    .on("mouseover.risk", function (event, d) {
+      const currentFill = d3.select(this).attr('fill');
+      // Store original fill for restoration
+      d3.select(this).attr('data-original-fill', currentFill);
+      
+      // Only change to hover blue if it's the default grey color
+      if (!currentFill || currentFill === '#f9fbfd' || currentFill === 'rgb(249, 251, 253)' || 
+          currentFill === '#f7f7f7' || currentFill === 'rgb(247, 247, 247)') {
+        d3.select(this).attr('fill', '#f0f0f8');
+      }
+      // Keep risk profile colors (reds) unchanged on hover
+    })
+    .on("mouseout.risk", function (event, d) {
+      const originalFill = d3.select(this).attr('data-original-fill');
+      const currentFill = d3.select(this).attr('fill');
+      
+      // Always restore to original color if we have it stored
+      if (originalFill) {
+        d3.select(this).attr('fill', originalFill);
+      } else if (currentFill === '#f0f0f8' || currentFill === 'rgb(240, 240, 248)') {
+        // Fallback: only revert hover blue to default grey if no original color stored
+        d3.select(this).attr('fill', '#f7f7f7');
+      }
+      
+      // Clean up the temporary attribute
+      d3.select(this).attr('data-original-fill', null);
+    });
 }
 
 /** ---------- CLICK BIND (after map is ready) ---------- **/

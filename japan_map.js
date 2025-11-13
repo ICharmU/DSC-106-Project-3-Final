@@ -141,16 +141,22 @@ async function renderJapanMap(opts = {}) {
       
       if (currentId === targetPrefectureId) {
         const element = d3.select(this);
-        const originalFill = '#f7f7f7'; // Standard grey background
+        // Store the current fill color and stroke width before changing
+        const currentFill = element.attr('fill');
+        const currentStrokeWidth = element.attr('stroke-width') || 0.6;
+        const originalFill = currentFill || '#f7f7f7'; // Use current color or default grey
+        const originalStrokeWidth = parseFloat(currentStrokeWidth);
         
-        // Set golden immediately at full opacity, then fade to grey over 1.6 seconds
+        // Set golden fill and triple stroke width immediately, then animate back over 1.6 seconds
         element
-          .attr('fill', '#e7c320ff')
+          .attr('fill', '#0c00bbff')
           .attr('fill-opacity', 1.0)
+          .attr('stroke-width', originalStrokeWidth * 3)
           .transition()
           .duration(1600)
           .attr('fill', originalFill)
-          .attr('fill-opacity', 1.0);
+          .attr('fill-opacity', 1.0)
+          .attr('stroke-width', originalStrokeWidth);
       }
     });
   }
@@ -443,7 +449,11 @@ async function renderJapanMap(opts = {}) {
       console.log(`SVG center: (${svgCenterX}, ${svgCenterY})`);
     })
     .on('mouseover', function (event, d) {
-      d3.select(this).attr('fill', '#f0f0f8');
+      // Preserve red risk profile colors, only change grey/default colors to blue hover
+      const currentFill = d3.select(this).attr('fill');
+      if (!currentFill || currentFill === '#f7f7f7' || currentFill === 'rgb(247, 247, 247)') {
+        d3.select(this).attr('fill', '#f0f0f8');
+      }
       // Extract prefecture name to match the CSV data format (English names like "Miyagi", "Tokyo", etc.)
       const props = d.properties || {};
       
@@ -488,7 +498,11 @@ async function renderJapanMap(opts = {}) {
   tip.style('left', (event.pageX + 12) + 'px').style('top', (event.pageY + 12) + 'px');
     })
     .on('mouseout', function () {
-      d3.select(this).attr('fill', '#f7f7f7');
+      // Only reset to grey if it was changed to blue on hover
+      const currentFill = d3.select(this).attr('fill');
+      if (currentFill === '#f0f0f8' || currentFill === 'rgb(240, 240, 248)') {
+        d3.select(this).attr('fill', '#f7f7f7');
+      }
   tip.style('display', 'none');
     })
     .on(enter + '.hoverFX', function (event, d) {
