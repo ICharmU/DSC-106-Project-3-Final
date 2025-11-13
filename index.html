@@ -1,72 +1,142 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DSC 106 Project 3</title>
-  <link rel="stylesheet" href="style.css">
-  <!-- Professional fonts: Inter for UI, Merriweather for headings -->
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Merriweather:wght@300;400;700&display=swap" rel="stylesheet">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>DSC 106 Project 3 — Japan Risk Profiles</title>
+
+  <!-- Fonts -->
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=Merriweather:wght@300;400;700&display=swap"
+    rel="stylesheet">
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="styles.css" />
+
+  <!-- Your existing JS (unchanged IDs) -->
   <script src="japan_map.js" type="module" defer></script>
   <script src="slider_filter.js" type="module" defer></script>
   <script src="prefecture_tooltip.js" type="module" defer></script>
 </head>
-<body>
-  <h1>
-    How do prefectures' risk profiles change in relation to natural disasters?
-  </h1>
-  <div class="slidecontainer">
-        <button id="prevButton">prev</button>
-        <input type="range" min="1960" max="2018" value="1960" class="slider" id="myRange">
-        <button id="nextButton">next</button>
-        <button id="autoplay">play</button>
-        <p>Year: <span id="demo"></span></p>
-  </div>
-  <div class="textcontainer">
-    <input type="text" id="myTextBox" placeholder="Enter a year">
-    <button id="myButton">Submit</button>
-  </div>
-  <div class="disasters">
-    <label class = "disaster-item">
-      <input type="checkbox" id="Drought" name="Drought" checked />
-      <span class="custom-checkbox"></span>
-      Drought
-    </label>
-    <label class = "disaster-item">
-      <input type="checkbox" id="Earthquake" name="Earthquake" checked />
-      <span class="custom-checkbox"></span>
-      Earthquake
-    </label>
-    <label class = "disaster-item">
-      <input type="checkbox" id="ExtremeTemperature" name="ExtremeTemperature" checked />
-      <span class="custom-checkbox"></span>
-      Extreme Temperature
-    </label>
-    <label class = "disaster-item">
-      <input type="checkbox" id="Flood" name="Flood" checked />
-      <span class="custom-checkbox"></span>
-      Flood
-    </label>
-    <label class = "disaster-item">
-      <input type="checkbox" id="Landslide" name="Landslide" checked />
-      <span class="custom-checkbox"></span>
-      Landslide
-    </label>
-    <label class = "disaster-item">
-      <input type="checkbox" id="Storm" name="Storm" checked />
-      <span class="custom-checkbox"></span>
-      Storm
-    </label>
-    <label class = "disaster-item">
-      <input type="checkbox" id="VolcanicActivity" name="VolcanicActivity" checked />
-      <span class="custom-checkbox"></span>
-      Volcanic Activity
-    </label>
 
+<body>
+  <div id="app">
+    <!-- Header -->
+    <header class="page-header card">
+      <h1>How do prefectures’ risk profiles change in relation to natural disasters?</h1>
+      <p class="subtitle">Japan • 1960–2018 • Prefecture-level risk index (human + economic impact)</p>
+    </header>
+
+    <!-- Controls + Filters (keeps your IDs intact) -->
+    <section id="controls-row" class="card">
+      <div class="control">
+        <label for="myRange">Year</label>
+        <div class="control-inline">
+          <button id="prevButton" type="button" class="btn">Prev</button>
+          <input type="range" min="1960" max="2024" value="1960" class="slider" id="myRange" />
+          <button id="nextButton" type="button" class="btn">Next</button>
+          <button id="autoplay" type="button" class="btn">Play</button>
+          <span class="year-pill">Year: <strong id="demo">1960</strong></span>
+        </div>
+      </div>
+
+      <div class="control">
+        <label for="myTextBox">Jump to year</label>
+        <div class="control-inline">
+          <input type="text" id="myTextBox" placeholder="Enter a year" />
+          <button id="myButton" type="button" class="btn">Submit</button>
+        </div>
+      </div>
+
+      <div class="control control--full">
+        <div class="disasters">
+          <span class="label">Filter by disaster type:</span>
+
+          <label class="disaster-item">
+            <input type="checkbox" id="Drought" name="Drought" checked />
+            <span class="custom-checkbox"></span> Drought
+          </label>
+
+          <label class="disaster-item">
+            <input type="checkbox" id="Earthquake" name="Earthquake" checked />
+            <span class="custom-checkbox"></span> Earthquake
+          </label>
+
+          <label class="disaster-item">
+            <input type="checkbox" id="ExtremeTemperature" name="ExtremeTemperature" checked />
+            <span class="custom-checkbox"></span> Extreme Temperature
+          </label>
+
+          <label class="disaster-item">
+            <input type="checkbox" id="Flood" name="Flood" checked />
+            <span class="custom-checkbox"></span> Flood
+          </label>
+
+          <label class="disaster-item">
+            <input type="checkbox" id="Landslide" name="Landslide" checked />
+            <span class="custom-checkbox"></span> Landslide
+          </label>
+
+          <label class="disaster-item">
+            <input type="checkbox" id="Storm" name="Storm" checked />
+            <span class="custom-checkbox"></span> Storm
+          </label>
+
+          <label class="disaster-item">
+            <input type="checkbox" id="VolcanicActivity" name="VolcanicActivity" checked />
+            <span class="custom-checkbox"></span> Volcanic Activity
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <!-- Main content area: Map + Detail -->
+    <section id="main-row" class="grid">
+      <!-- Map card -->
+      <div id="map-container" class="card">
+        <div class="card-head">
+          <h2>Japan choropleth map</h2>
+          <p class="card-sub">Color encodes Risk Index for the selected year</p>
+        </div>
+        <!-- Keep the same ID for your D3 map -->
+        <svg id="map" aria-label="Japan risk map (D3)"></svg>
+        <div id="map-legend"></div>
+      </div>
+
+      <!-- Detail card (secondary plot / per-prefecture panel) -->
+      <div id="detail-container" class="card">
+        <div class="card-head">
+          <h2 id="detail-title">Click a prefecture to explore its profile</h2>
+          <p class="card-sub">Time-series of risk, event counts, and hazard mix</p>
+        </div>
+        <!-- Your JS can target these as needed -->
+        <svg id="detail-svg" aria-label="Prefecture detail chart"></svg>
+        <div id="detail-summary"></div>
+      </div>
+    </section>
+
+    <!-- “Writeup” now as an on-page card -->
+    <section id="report" class="card">
+      <h2>Writeup</h2>
+      <p>
+        This section mirrors your previous <em>writeup.html</em> styling but lives on the same page. You can
+        expand with design decisions, rationale, and references. If you prefer keeping a separate page, you can
+        still link out:
+        <a href="#report">Jump to writeup</a>.
+      </p>
+
+      <h3>Design decisions and rationale</h3>
+      <ul>
+        <li>Card layout isolates controls, map, and details for clean scanning.</li>
+        <li>Sequential white→red palette matches the Japan flag motif.</li>
+        <li>Map is responsive via SVG viewBox; detail view updates on prefecture click.</li>
+      </ul>
+    </section>
   </div>
-  <svg id="map" aria-label="World map (D3)"></svg>
-  <div>
-    <h2><a href="./writeup.html">Writeup (click here)</a></h2>
-  </div>
+
+  <!-- Tooltip for D3 (same class name you had before) -->
+  <div class="d3-tooltip" id="tooltip" style="display:none;"></div>
 </body>
+
 </html>

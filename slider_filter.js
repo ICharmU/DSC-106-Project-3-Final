@@ -1,13 +1,5 @@
 import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 
-// japan_map.js
-// Simple D3 map renderer for Japan prefectures.
-// - Loads ./data/japan_prefectures.geojson if present, otherwise falls back
-//   to a public URL (user may replace with a local copy for reliability).
-// - Renders prefecture polygons, prefecture borders, hover tooltip, and
-//   a click-to-zoom-to-prefecture behavior with an animated fit (respects
-//   prefers-reduced-motion).
-
 let disasters = ['drought', 'earthquake', 'extreme temperature', 'flood', 'landslide', 'storm', 'volcanic activity'];
 
 const opts = {
@@ -25,7 +17,76 @@ const g = d3.select("g.map-group");
 
 const tip = d3.select('.d3-tooltip');
 
+// --- DISASTER COLOR PALETTES (SWAPPABLE) ---
+const DISASTER_KEYS = [
+  'drought','earthquake','extreme temperature','flood',
+  'landslide','storm','volcanic activity'
+];
 
+const disasterData = await d3.csv('./data/gdis_emdat_japan_prefecture_merged_enh.csv');
+let year = 1960;
+
+const paletteDefault = {
+  'drought': '#4E79A7',
+  'earthquake': '#F28E2B',
+  'extreme temperature': '#E15759',
+  'flood': '#76B7B2',
+  'landslide': '#59A14F',
+  'storm': '#EDC948',
+  'volcanic activity': '#AF7AA1'
+};
+
+// High-contrast preset
+const paletteHighContrast = {
+  'drought': '#D4A017',          // bold blue
+  'earthquake': '#7B3F00',       // vivid red
+  'extreme temperature': '#FF7F00', // strong orange
+  'flood': '#005AB5',            // teal
+  'landslide': '#2CA02C',        // green
+  'storm': '#8A2BE2',            // violet
+  'volcanic activity': '#DC3220' // black
+};
+
+// Active palette (start with default)
+let ACTIVE_PALETTE = { ...paletteDefault };
+
+// Helper: color accessor
+function disasterColor(key) {
+  return ACTIVE_PALETTE[key] || '#889';
+}
+
+function idToCanonical(id) {
+  if (id === 'ExtremeTemperature') return 'extreme temperature';
+  if (id === 'VolcanicActivity')  return 'volcanic activity';
+  return id.toLowerCase();
+}
+
+// After the map layers exist, we’ll wire these up:
+const activeDisasters = new Set(DISASTER_KEYS);
+
+// ----------------- MAP LAYERS -----------------
+//const gBasemap = root.selectAll('g.basemap').data([null]).join('g').attr('class', 'basemap');
+const mapGroup = d3.select('g.map-group');
+const gPoints  = mapGroup.selectAll('g.points')
+  .data([null])
+  .join('g')
+  .attr('class', 'points');
+
+// Colorize the checkbox squares to match the palette
+function colorizeCheckboxes() {
+  document.querySelectorAll('.disaster-item input').forEach(input => {
+    const id = input.id; // your ID casing
+    const canonical = (
+      id === 'ExtremeTemperature' ? 'extreme temperature' :
+      id === 'VolcanicActivity' ? 'volcanic activity' :
+      id.toLowerCase()
+    );
+    const swatch = input.nextElementSibling; // <span class="custom-checkbox"> (kept in your HTML)
+    if (!swatch) return;
+    swatch.style.backgroundColor = input.checked ? disasterColor(canonical) : 'transparent';
+    swatch.style.border = `2px solid ${disasterColor(canonical)}`;
+  });
+}
 
 // Load Japan prefectures GeoJSON from the specified URL
 const japanPrefecturesUrl = 'https://raw.githubusercontent.com/dataofjapan/land/master/japan.geojson';
@@ -43,24 +104,24 @@ try {
 }
 
 //assign color
-const color = d3.scaleOrdinal().domain(disasters)
-.range(d3.schemeTableau10); 
+//const color = d3.scaleOrdinal().domain(disasters)
+//.range(d3.schemeTableau10); 
 
 //color code checkboxes
-document.querySelectorAll('.disaster-item input').forEach(input => {
-  const disaster = input.id.toLowerCase(); // match your disasters array
-  const box = input.nextElementSibling;    // the <span> custom checkbox
-  box.style.backgroundColor = color(disaster.toLowerCase());
+// document.querySelectorAll('.disaster-item input').forEach(input => {
+//   const disaster = input.id.toLowerCase(); // match your disasters array
+//   const box = input.nextElementSibling;    // the <span> custom checkbox
+//   box.style.backgroundColor = color(disaster.toLowerCase());
 
-  // Toggle color on click
-  input.addEventListener('change', () => {
-    if (input.checked) {
-      box.style.backgroundColor = color(disaster.toLowerCase()); // colored
-    } else {
-      box.style.backgroundColor = 'white'; // unchecked = white
-    }
-  });
-});
+//   // Toggle color on click
+//   input.addEventListener('change', () => {
+//     if (input.checked) {
+//       box.style.backgroundColor = color(disaster.toLowerCase()); // colored
+//     } else {
+//       box.style.backgroundColor = 'white'; // unchecked = white
+//     }
+//   });
+// });
 
 // projection + path. Use fitSize to compute a scale that fits the features
 const projection = d3.geoMercator();
@@ -74,73 +135,111 @@ try {
     projection.scale(2000).center([138, 36.5]).translate([width / 2, height / 2]);
 }
 
-const disasterData = await d3.csv('./data/gdis_emdat_japan_prefecture_merged_enh.csv');
-let year = 1960;
-
 function renderDisasterPoints(year) {
-    try {
-        
-        // Filter out rows with missing coordinates
-        const validData = disasterData.filter(d => 
-        d.latitude && d.longitude && 
-        !isNaN(+d.latitude) && !isNaN(+d.longitude)
-        && d.year == year && disasters.includes(d.disaster_type_gdis));
-        console.log(disasters);
-        
-        console.log(`Loaded ${validData.length} disaster events with valid coordinates`);
+  try {
+    // Filter out rows with missing coordinates
+    const validData = disasterData.filter(d =>
+      d.latitude && d.longitude &&
+      !isNaN(+d.latitude) && !isNaN(+d.longitude) &&
+      +d.year === +year &&
+      activeDisasters.has(d.disaster_type_gdis)
+    );
 
-        g.selectAll('circle.disaster-point').remove();
-        
-        // Add red dots for each disaster location
-        const dots = g.selectAll('circle.disaster-point')
-        .data(validData)
-        .join('circle')
-        .attr('class', 'disaster-point')
-        .attr('cx', d => projection([+d.longitude, +d.latitude])[0])
-        .attr('cy', d => projection([+d.longitude, +d.latitude])[1])
-        .attr('r', 3)
-        .attr('fill', d => color(d.disaster_type_gdis))
-        .attr('stroke', d => d3.color(color(d.disaster_type_gdis)).darker(1))
-        .attr('stroke-width', 0.5)
-        .attr('opacity', 0.7)
-        .style('cursor', 'pointer')
-        .on('mouseover', function(event, d) {
-            d3.select(this).attr('r', 5).attr('opacity', 1);
-            // format numbers for readability
-            const fmt = new Intl.NumberFormat();
-            const fmtCurrency = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
-            const deaths = d.deaths ?? d.death ?? '';
-            const affected = d.affected ?? d.total_affected ?? d.affect ?? '';
-            const injured = d.injured ?? '';
-            const homeless = d.homeless ?? '';
-            const damageUsd = (d.damage_final_usd ?? d.damage_final) ?? d.damage_adj_usd ?? '';
+    console.log(`Loaded ${validData.length} disaster events with valid coordinates`);
 
-            const tooltipText = `
-            <strong>${d.disaster_type_gdis || 'Disaster'}</strong><br/>
-            Location: ${d.location_str || 'Unknown'}<br/>
-            Prefecture: ${d.prefecture || 'Unknown'}<br/>
-            Year: ${d.year || 'Unknown'}<br/>
-            Affected: ${affected !== '' ? fmt.format(Number(affected)) : 'N/A'}<br/>
-            Injured: ${injured !== '' ? fmt.format(Number(injured)) : 'N/A'}<br/>
-            Homeless: ${homeless !== '' ? fmt.format(Number(homeless)) : 'N/A'}<br/>
-            Deaths: ${deaths !== '' ? fmt.format(Number(deaths)) : 'N/A'}<br/>
-            Damage (USD): ${damageUsd !== '' ? fmtCurrency.format(Number(damageUsd)) : 'N/A'}
-            `;
-            tip.style('display', 'block').html(tooltipText);
-        })
-        .on('mousemove', function(event) {
-            tip.style('left', (event.pageX + 12) + 'px').style('top', (event.pageY + 12) + 'px');
-        })
-        .on('mouseout', function() {
-            d3.select(this).attr('r', 3).attr('opacity', 0.7);
-            tip.style('display', 'none');
-        });
-        
-        console.log('Disaster points rendered');
-    } catch (e) {
-        console.warn('Failed to load or render disaster data:', e.message);
-    }
+    // --- KEYED JOIN (no pre-remove) for smooth enter/exit transitions ---
+    const keyFn = d =>
+      `${d.disaster_type_gdis}|${(+d.longitude).toFixed(3)},${(+d.latitude).toFixed(3)}|${d.year}`;
+
+    const dots = gPoints
+      .selectAll('circle.disaster-point')
+      .data(validData, keyFn);
+
+    // ENTER: fade + grow
+    const dotsEnter = dots.enter()
+      .append('circle')
+      .attr('class', 'disaster-point')
+      .attr('cx', d => projection([+d.longitude, +d.latitude])[0])
+      .attr('cy', d => projection([+d.longitude, +d.latitude])[1])
+      .attr('r', 0)
+      .attr('fill', d => disasterColor(d.disaster_type_gdis))
+      .attr('stroke', d => d3.color(disasterColor(d.disaster_type_gdis)).darker(1))
+      .attr('stroke-width', 0.6)
+      .attr('opacity', 0)
+      .style('cursor', 'pointer')
+      .call(sel => sel.transition().duration(380)
+        .attr('opacity', 0.9)
+        .attr('r', 3.5)
+      );
+
+    // UPDATE: gently move/recolor if needed
+    dots.transition().duration(320)
+      .attr('cx', d => projection([+d.longitude, +d.latitude])[0])
+      .attr('cy', d => projection([+d.longitude, +d.latitude])[1])
+      .attr('fill', d => disasterColor(d.disaster_type_gdis))
+      .attr('stroke', d => d3.color(disasterColor(d.disaster_type_gdis)).darker(1));
+
+    // EXIT: fade + shrink
+    dots.exit()
+      .transition().duration(280)
+      .attr('opacity', 0)
+      .attr('r', 0)
+      .remove();
+
+    // (Re)attach hover handlers on the merged selection
+    const merged = dotsEnter.merge(dots);
+    merged
+      .on('mouseover', function (event, d) {
+        d3.select(this).transition().duration(120).attr('r', 5).attr('opacity', 1);
+        // format numbers for readability
+        const fmt = new Intl.NumberFormat();
+        const fmtCurrency = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 });
+        const deaths = d.deaths ?? d.death ?? '';
+        const affected = d.affected ?? d.total_affected ?? d.affect ?? '';
+        const injured = d.injured ?? '';
+        const homeless = d.homeless ?? '';
+        const damageUsd = (d.damage_final_usd ?? d.damage_final) ?? d.damage_adj_usd ?? '';
+
+        const tooltipText = `
+          <strong>${d.disaster_type_gdis || 'Disaster'}</strong><br/>
+          Location: ${d.location_str || 'Unknown'}<br/>
+          Prefecture: ${d.prefecture || 'Unknown'}<br/>
+          Year: ${d.year || 'Unknown'}<br/>
+          Affected: ${affected !== '' ? fmt.format(Number(affected)) : 'N/A'}<br/>
+          Injured: ${injured !== '' ? fmt.format(Number(injured)) : 'N/A'}<br/>
+          Homeless: ${homeless !== '' ? fmt.format(Number(homeless)) : 'N/A'}<br/>
+          Deaths: ${deaths !== '' ? fmt.format(Number(deaths)) : 'N/A'}<br/>
+          Damage (USD): ${damageUsd !== '' ? fmtCurrency.format(Number(damageUsd)) : 'N/A'}
+        `;
+        tip.style('display', 'block').html(tooltipText);
+      })
+      .on('mousemove', function (event) {
+        tip.style('left', (event.pageX + 12) + 'px').style('top', (event.pageY + 12) + 'px');
+      })
+      .on('mouseout', function () {
+        d3.select(this).transition().duration(120).attr('r', 3.5).attr('opacity', 0.9);
+        tip.style('display', 'none');
+      });
+
+  } catch (e) {
+    console.warn('Failed to load or render disaster data:', e.message);
+  }
 }
+
+
+function syncFromCheckboxes() {
+  activeDisasters.clear();
+  document.querySelectorAll('.disaster-item input').forEach(input => {
+    const key = idToCanonical(input.id);
+    if (input.checked) activeDisasters.add(key);
+  });
+  colorizeCheckboxes();
+  renderDisasterPoints(year);
+}
+
+document.querySelectorAll('.disaster-item input').forEach(input => {
+  input.addEventListener('change', syncFromCheckboxes);
+});
 
 function autoplayYears() {
     let forward = true;
@@ -172,12 +271,24 @@ function autoplayYears() {
             else {
                 year -= 1;
             }
-            setTimeout(nestedAutoplay, 200)
+            setTimeout(nestedAutoplay, 360)
         }
     }
 }
 
+// ----------------- PALETTE SWITCHER (now safe to call) -----------------
+window.setDisasterPalette = (which = 'default') => {
+  ACTIVE_PALETTE = (which === 'high') ? { ...paletteHighContrast } : { ...paletteDefault };
+  colorizeCheckboxes();
+  renderDisasterPoints(year);
+};
+
+// Initial paint AFTER everything exists:
+colorizeCheckboxes();
 renderDisasterPoints(year);
+// pick whichever you want as default:
+setDisasterPalette('high');
+// setDisasterPalette('default');
 
 
 var slider = document.getElementById("myRange");
@@ -341,3 +452,5 @@ volcanoCheck.addEventListener('click', function() {
     }
     renderDisasterPoints(year);
 });
+
+gPoints.raise();

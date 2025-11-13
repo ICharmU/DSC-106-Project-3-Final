@@ -1,4 +1,3 @@
-
 import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 
 // japan_map.js
@@ -118,6 +117,10 @@ async function renderJapanMap(opts = {}) {
     projection.scale(2000).center([138, 36.5]).translate([width / 2, height / 2]);
   }
 
+  const enter = ('onpointerenter' in window) ? 'pointerenter' : 'mouseenter';
+  const leave = ('onpointerleave' in window) ? 'pointerleave' : 'mouseleave';
+  const move  = ('onpointermove'  in window) ? 'pointermove'  : 'mousemove';
+
   // draw prefectures
   const prefectures = g.selectAll('path.prefecture')
     .data(japanGeo.features)
@@ -151,8 +154,6 @@ async function renderJapanMap(opts = {}) {
       }
     });
   }
-
-
 
   prefectures
     .on('click', function (event, d) {
@@ -489,27 +490,23 @@ async function renderJapanMap(opts = {}) {
     .on('mouseout', function () {
       d3.select(this).attr('fill', '#f7f7f7');
   tip.style('display', 'none');
+    })
+    .on(enter + '.hoverFX', function (event, d) {
+      // Visuals only: add hovered class & raise; let tooltip scripts handle content
+      d3.select(this).classed('hovered', true);
+      document.body.classList.add('pref-hover-active');
+    })
+    .on(move + '.hoverFX', function () {
+      // nothing needed here for visuals; tooltip script positions itself
+    })
+    .on(leave + '.hoverFX', function () {
+      d3.select(this).classed('hovered', false);
+      // If no other prefecture is hovered, drop the body flag
+      const anyHovered =
+        document.querySelector('path.prefecture.hovered') ||
+        document.querySelector('path.pref.hovered');
+      if (!anyHovered) document.body.classList.remove('pref-hover-active');
     });
-
-  // Draw prefecture boundaries using the already loaded data
-  // Use a single mesh path to create shared borders between prefectures
-  try {
-    const mesh = d3.geoMesh(japanGeo, (a, b) => a !== b);
-    
-    g.append('path')
-      .datum(mesh)
-      .attr('class', 'prefecture-boundaries')
-      .attr('d', path)
-      .attr('fill', 'none')
-      .attr('stroke', '#444')
-      .attr('stroke-width', 0.6)
-      .attr('pointer-events', 'none')
-      .attr('opacity', 0.95);
-      
-    console.log('Prefecture boundaries drawn');
-  } catch (e) {
-    console.warn('Failed to draw prefecture boundaries:', e.message);
-  }
 
   // Set up D3 zoom behavior for the animation
   const zoom = d3.zoom()
@@ -553,8 +550,8 @@ async function renderJapanMap(opts = {}) {
 if (typeof window !== 'undefined') {
   // call and catch to avoid unhandled promise rejections
   const opts = {
-    clipBottomPercent: 10,
-    postClipWidth: "60%",
+    clipBottomPercent: 0,
+    postClipWidth: "100%",
   };
   renderJapanMap(opts).catch(err => console.error('renderJapanMap error:', err));
 }

@@ -1,0 +1,378 @@
+/* Base */
+* {
+    box-sizing: border-box;
+}
+
+:root {
+    --bg: hsl(220 10% 95%);
+    --card: #ffffff;
+    --ink: #222;
+    --muted: #586174;
+    --rule: hsl(220 12% 88%);
+    --shadow: 0 1px 4px rgba(0, 0, 0, .08);
+    --radius: 12px;
+
+    --brand: #b00020;
+    /* accent (red) */
+    --brand-ink: #7a0016;
+
+    --font-ui: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-h: 'Merriweather', Georgia, serif;
+}
+
+html,
+body {
+    height: 100%;
+    margin: 0;
+    color: var(--ink);
+    font-family: var(--font-ui);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background: var(--bg);
+}
+
+/* App container */
+#app {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 18px 18px 32px;
+}
+
+/* Cards */
+.card {
+    background: var(--card);
+    border: 1px solid var(--rule);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 14px 16px;
+}
+
+.card+.card {
+    margin-top: 16px;
+}
+
+.card-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 6px;
+}
+
+/* Headings */
+.page-header h1 {
+    font-family: var(--font-h);
+    font-weight: 700;
+    font-size: clamp(1.6rem, 1rem + 2.4vw, 2.4rem);
+    margin: 0 0 8px;
+    line-height: 1.15;
+    letter-spacing: 0;
+}
+
+.subtitle {
+    margin: 0;
+    color: var(--muted);
+}
+
+/* Controls row (keeps your IDs) */
+#controls-row {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 14px;
+}
+
+.control {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    font-size: 14px;
+}
+
+.control-inline {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+#controls-row .control:nth-child(1) {
+    grid-column: span 7;
+}
+
+#controls-row .control:nth-child(2) {
+    grid-column: span 5;
+}
+
+#controls-row .control.control--full {
+    grid-column: 1 / -1;
+}
+
+label {
+    font-weight: 600;
+}
+
+.label {
+    font-weight: 600;
+    margin-right: 8px;
+    color: var(--muted);
+}
+
+/* Buttons + slider */
+.btn {
+    padding: 6px 12px;
+    font-size: 13px;
+    border: 1px solid var(--rule);
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+}
+
+.btn:hover {
+    background: #f2f2f2;
+}
+
+.slider {
+    width: 240px;
+}
+
+.year-pill {
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #f4f5f7;
+    border: 1px solid var(--rule);
+    font-size: 13px;
+}
+
+/* Disaster checkboxes (uses your existing structure/IDs) */
+.disasters {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px 16px;
+}
+
+.disaster-item {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.disaster-item input {
+    appearance: none;
+    width: 14px;
+    height: 14px;
+    border: 1px solid var(--rule);
+    border-radius: 4px;
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.disaster-item input:checked {
+    background: var(--brand);
+    border-color: var(--brand);
+}
+
+/* If you want the extra <span class="custom-checkbox"> look, keep it simple: */
+.custom-checkbox {
+    display: inline-block;
+    width: 16px;
+    height: 16px;
+    border: 2px solid var(--rule);
+    border-radius: 4px;
+    box-shadow: inset 0 0 0 1px rgba(0, 0, 0, .04);
+    transition: background-color .15s ease, border-color .15s ease;
+}
+
+/* Layout for main content */
+.grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+    gap: 16px;
+    margin-top: 16px;
+}
+
+/* Map + Detail cards */
+#map-container h2,
+#detail-container h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.card-sub {
+    margin: 0;
+    color: var(--muted);
+    font-size: 13px;
+}
+
+#map,
+/* when #map is svg */
+#map svg {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    aspect-ratio: 12 / 7;
+    height: auto;
+    margin: 6px auto 0;
+    box-sizing: border-box;
+    border-radius: 8px;
+}
+
+/* Legend + detail */
+#map-legend {
+    margin-top: 10px;
+    font-size: 12px;
+    color: #444;
+}
+
+#detail-svg {
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+}
+
+#detail-summary {
+    margin-top: 10px;
+    font-size: 14px;
+    color: #444;
+}
+
+/* Writeup card */
+#report h2 {
+    margin: 2px 0 8px;
+}
+
+#report p,
+#report li {
+    color: #333;
+}
+
+/* D3 tooltip */
+.d3-tooltip {
+    position: absolute;
+    pointer-events: none;
+    padding: 8px 10px;
+    font-size: 12px;
+    background: rgba(0, 0, 0, .82);
+    color: #fff;
+    border-radius: 6px;
+    z-index: 1000;
+    max-width: min(90vw, 520px);
+    white-space: normal;
+    word-break: break-word;
+}
+
+/* Responsive */
+@media (max-width: 960px) {
+    .grid {
+        grid-template-columns: 1fr;
+    }
+
+    #controls-row .control:nth-child(1),
+    #controls-row .control:nth-child(2) {
+        grid-column: 1 / -1;
+    }
+
+    .slider {
+        width: 200px;
+    }
+}
+
+@media (max-width: 520px) {
+    .slider {
+        width: 160px;
+    }
+
+    .btn {
+        padding: 5px 10px;
+    }
+}
+
+/* --- MAP EMPHASIS OVERRIDES --- */
+
+/* Give the whole app more horizontal room */
+#app {
+    max-width: 1440px;
+    /* was 1200 */
+}
+
+/* Make the map column larger than the detail column */
+.grid {
+    grid-template-columns: minmax(0, 2.1fr) minmax(0, 1fr);
+    /* was 1.2fr / 1fr */
+}
+
+/* Let the SVG breathe a bit more vertically */
+#map,
+#map svg {
+    aspect-ratio: 11 / 7;
+    /* was 12 / 7, a tad taller now */
+    margin: 10px auto 0;
+}
+
+/* On narrow screens, still stack gracefully */
+@media (max-width: 960px) {
+    .grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* --- PREFECTURE HOVER VISUALS --- */
+.pref {
+    fill: #f9fbfd;
+    /* soft neutral */
+    stroke: #888ea3;
+    /* subtle border */
+    stroke-width: 0.6px;
+    transition: fill 180ms ease, stroke 180ms ease, stroke-width 180ms ease, filter 180ms ease;
+}
+
+.pref.hovered {
+    fill: #fff;
+    /* lift */
+    stroke: #0b3d91;
+    /* brandy-blue edge */
+    stroke-width: 2px;
+    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, .25));
+    /* slight glow */
+}
+
+/* Disaster dots pick up a hairline outline for contrast */
+circle.disaster-point {
+    vector-effect: non-scaling-stroke;
+}
+
+/* --- PREFECTURE HOVER POP (applies to .prefecture and .pref) --- */
+.prefecture,
+.pref {
+    fill: #f9fbfd;
+    stroke: #888ea3;
+    stroke-width: 0.6px;
+    transition: fill 180ms ease, stroke 180ms ease, stroke-width 180ms ease, filter 180ms ease, opacity 180ms ease;
+    vector-effect: non-scaling-stroke;
+    /* keeps borders consistent when zooming */
+}
+
+/* Add a slight dim to non-hovered polygons while hovering something (optional but nice) */
+body.pref-hover-active .prefecture:not(.hovered),
+body.pref-hover-active .pref:not(.hovered) {
+    opacity: 0.75;
+}
+
+/* The “pop”: thicker, darker border + soft glow, lift fill slightly */
+.prefecture.hovered,
+.pref.hovered {
+    fill: #ffffff;
+    /* subtle lift */
+    stroke: #1d2a51;
+    /* dark navy for contrast */
+    stroke-width: 2.4px;
+    /* thicker edge */
+    filter: drop-shadow(0 1px 3px rgba(0, 0, 0, .28)) drop-shadow(0 0 6px rgba(13, 60, 145, .35));
+}
