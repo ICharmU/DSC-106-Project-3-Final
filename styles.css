@@ -453,9 +453,9 @@ body.pref-hover-active .pref:not(.hovered) {
 #formula-box {
     flex: 1 1 auto;
     /* fill down to bottom */
-    overflow: auto;
+    overflow: scroll;
     /* internal scroll */
-    max-height: none;
+    /* max-height: none; */
     /* don't clamp */
     padding: 8px 10px;
     border: 1px solid var(--border, #e5e7eb);
