@@ -47,12 +47,13 @@
     <!-- Controls + Filters (keeps your IDs intact) -->
     <section id="controls-row" class="card">
       <div class="control">
-        <label for="myRange" id="demo">Year</label>
+        <label for="myRange">Year</label>
         <div class="control-inline">
           <button id="prevButton" type="button" class="btn">Prev</button>
           <input type="range" min="1960" max="2018" value="1960" class="slider" id="myRange" />
           <button id="nextButton" type="button" class="btn">Next</button>
           <button id="autoplay" type="button" class="btn">Play</button>
+          <span class="year-pill">Year: <strong id="demo">1960</strong></span>
         </div>
       </div>
 
@@ -140,7 +141,28 @@
         <li>Card layout isolates controls, map, and details for clean scanning.</li>
         <li>Sequential white→red palette matches the Japan flag motif.</li>
         <li>Map is responsive via SVG viewBox; detail view updates on prefecture click.</li>
+      
       </ul> -->
+      <p> Geospatial visualization: With a focus on tracking disaster events over time across various regions in Japan, it allows readers to see the prefecture locations of disaster occurrences. This helps track where major 
+        disaster events hit the country, such as the 2011 Japanese earthquakes, which had a high concentration in the northern region of Japan. To help viewers navigate through yearly profiles with ease, a slider and a text 
+        box tool were used. Whether a user wants to find country data for a specific year (textbox) or scroll through multiple years (slider), both tools are easily accessible above the geospatial data.
+      <br></br>
+        Previous alternatives: We originally considered expanding our geospatial visualization globally and only tracking disaster locations and country risk profiles. However, this limited us to looking at countries’ disaster 
+        data aggregates, giving us little flexibility to measure how, on a regional basis, countries were impacted by the aftermath of any given disaster event. As such, focusing on Japan specifically mitigated this issue and allowed 
+        us to do a deeper dive into regional risk profile statistics, and produced a more comprehensive and meaningful visualization.
+        <br></br>
+        Disaster points and filters: To differentiate between disaster types, each was assigned one color that appeared on the map and on filtering boxes. By implementing the filter boxes, users can easily filter through different 
+        disaster types to show more/less data in a given year.
+        <br></br>
+        Risk profile and prefecture click: we sought to create a risk estimate (risk profile) by balancing economic and personal impact scores for each disaster. The personal impact score weighted deaths higher than individuals affected 
+        to account for the indirect, but profound, impacts on friends' and families' lives. Each prefecture per year was assigned a risk number, a composite calculation of economic and personal impact scores. A gradient color scale was 
+        used to map prefecture risk in a given year, highlighting the degree of risk and allowing for risk comparisons across prefectures. To let users track changes in risk profiles over time, we implemented a click function that generates
+        a time-series graph for a 60-year risk profile if users click a prefecture. A key for risk definition was included in addition to a gradient key for easier interpretability of the risk data. 
+         <br></br>
+      Hover: To let viewers see damage resulting from a given disaster event, a hover tooltip was implemented. This allowed us to maximize the information we present in the tool tip while maintaining a minimal ink-to-data ratio when the 
+      disaster point wasn’t hovered.
+      <br></br>
+      Card format: to keep the overall visualization clean to maximize user engagement, each section of interaction and data was separated into cards. </p>
     </section>
 
     <!-- <div id="mj-test">\( \text{human\_burden},\; \text{econ\_burden},\; \text{damage}_{\$,\,\text{final}} \)</div> -->
