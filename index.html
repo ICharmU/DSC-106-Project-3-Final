@@ -135,12 +135,51 @@
     <section id="report" class="card">
       <h2>Writeup</h2>
 
-      <h3>Design decisions and rationale</h3>
+      <h3>Design Decisions and Rationale</h3>
       <!-- <ul>
         <li>Card layout isolates controls, map, and details for clean scanning.</li>
         <li>Sequential white→red palette matches the Japan flag motif.</li>
         <li>Map is responsive via SVG viewBox; detail view updates on prefecture click.</li>
       </ul> -->
+       <p>
+      <b>Geospatial visualization:</b> With a focus on tracking disaster events over time across various regions in Japan, it allows readers to see the prefecture locations of disaster occurrences. This helps track where major 
+          disaster events hit the country, such as the 2011 Japanese earthquakes, which had a high concentration in the northern region of Japan. To help viewers navigate through yearly profiles with ease, a slider and a text 
+          box tool were used. Whether a user wants to find country data for a specific year (textbox) or scroll through multiple years (slider), both tools are easily accessible above the geospatial data.
+        <br></br>
+          <b>Previous alternatives:</b> We originally considered expanding our geospatial visualization globally and only tracking disaster locations and country risk profiles. However, this limited us to looking at countries’ disaster 
+          data aggregates, giving us little flexibility to measure how, on a regional basis, countries were impacted by the aftermath of any given disaster event. As such, focusing on Japan specifically mitigated this issue and allowed 
+          us to do a deeper dive into regional risk profile statistics, and produced a more comprehensive and meaningful visualization.
+          <br></br>
+          <b>Disaster points and filters:</b> To differentiate between disaster types, each was assigned one color that appeared on the map and on filtering boxes. By implementing the filter boxes, users can easily filter through different 
+          disaster types to show more/less data in a given year.
+          <br></br>
+          <b>Risk profile and prefecture click:</b> we sought to create a risk estimate (risk profile) by balancing economic and personal impact scores for each disaster. The personal impact score weighted deaths higher than individuals affected 
+          to account for the indirect, but profound, impacts on friends' and families' lives. Each prefecture per year was assigned a risk number, a composite calculation of economic and personal impact scores. A gradient color scale was 
+          used to map prefecture risk in a given year, highlighting the degree of risk and allowing for risk comparisons across prefectures. To let users track changes in risk profiles over time, we implemented a click function that generates
+          a time-series graph for a 60-year risk profile if users click a prefecture. A key for risk definition was included in addition to a gradient key for easier interpretability of the risk data. 
+          <br></br>
+          <b>Hover:</b> To let viewers see damage resulting from a given disaster event, a hover tooltip was implemented. This allowed us to maximize the information we present in the tool tip while maintaining a minimal ink-to-data ratio when the 
+        disaster point wasn’t hovered.
+        <br></br>
+        <b>Card format:</b> to keep the overall visualization clean to maximize user engagement, each section of interaction and data was separated into cards. </p>
+
+        <h3>Development Process</h3>
+        <p>
+          In the initial stages of the development process, most of the work was focused on finding the best way to visualize the NASA MODIS natural disaster data. As such, for the first 1.5 weeks, most of the work was done individually, with 
+          each group member testing various JS and D3 methods to determine the feasibility and capability of potential methods of visualization. We had 4 in-person/online meetings, two for initial brainstorming and two for working on our final 
+          visualization. Our in-person meetings lasted for 2 hours each, allowing us to do a deep dive into determining our project goals and for group coding/feedback. The dataset used to guide our final design was the MODIS Geocoded Disasters 
+          (GDIS) dataset, which showcased global disasters over 60 years, with supplementary GeoJSON and risk profile datasets used to complement the disasters dataset. This decision was ultimately reached through the narrowing down of our project 
+          scope, with Odessa’s preliminary interactive visualization focused on disaster distribution across Japan as a major stepping stone in defining the location bounds for our data. The workload for the project was as follows:
+          <br></br>
+          <b>Uzair:</b> data cleaning using the MODIS dataset with supplementary Japan datasets, creating prefecture on-click feature logic
+          <br></br>
+          <b>Sean:</b> tooltip features, zoom animation, rendering Japan GeoJSON file
+          <br></br>
+          <b>Uday:</b> slider and button implementation, filtering over disaster types
+          <br></br>
+          <b>Odessa:</b> color coding disaster types, final writeup
+
+        </p>
     </section>
 
     <!-- <div id="mj-test">\( \text{human\_burden},\; \text{econ\_burden},\; \text{damage}_{\$,\,\text{final}} \)</div> -->
