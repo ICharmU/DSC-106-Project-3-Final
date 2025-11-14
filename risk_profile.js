@@ -340,9 +340,9 @@ function drawLegend() {
     .attr("class", "legend");
 
   // Title (optional)
-  box.append("div")
-    .attr("class", "legend-title")
-    .text("Risk (final) — percentile bins");
+  // box.append("div")
+  //   .attr("class", "legend-title")
+  //   .text("Risk (final) — percentile bins");
 
   // Bar
   const bar = box.append("div").attr("class", "legend-bar");
@@ -369,7 +369,7 @@ function drawLegend() {
   // Note
   box.append("div")
     .attr("class", "legend-note")
-    .text("Numbers are risk × 100; colors are global percentiles.");
+    .text("Numbers are risk × 100; colors are binned by percentiles.");
 }
 
 /** ---------- DETAIL ---------- **/
@@ -459,6 +459,7 @@ async function waitForMathJax() {
   });
 }
 
+// Sidebar: only the essential formulas
 async function drawFormulas(formulas) {
   // Remove any existing box
   const old = document.getElementById("formula-box");
@@ -470,18 +471,16 @@ async function drawFormulas(formulas) {
     return;
   }
 
-  // Create the container div
   const box = document.createElement("div");
   box.id = "formula-box";
   box.style.lineHeight = "1.25";
   detail.appendChild(box);
 
-  // Title
   const title = document.createElement("h3");
   title.textContent = "Risk Profile Formulae";
   box.appendChild(title);
 
-  // Helper: inline math row
+  // helper: inline math row
   async function addInline(label, latex) {
     const row = document.createElement("div");
 
@@ -500,7 +499,6 @@ async function drawFormulas(formulas) {
         row.appendChild(span);
       }
     } else {
-      // Fallback: show raw text
       const span = document.createElement("span");
       span.textContent = latex || "(not specified)";
       row.appendChild(span);
@@ -509,54 +507,129 @@ async function drawFormulas(formulas) {
     box.appendChild(row);
   }
 
-  // Helper: block display math
-  async function addDisplay(label, latex) {
-    const header = document.createElement("b");
-    header.textContent = label;
-    box.appendChild(header);
+  // 1) Event-level formulas
+  await addInline("Event (human):",    formulas?.human_event?.latex);
+  await addInline("Event (economic):", formulas?.econ_event?.latex);
+
+  // 2) Prefecture-year risk (the “headline” equation)
+  await addInline("Prefecture-year risk:", formulas?.risk_pref_year?.latex);
+
+  // Small plain-text explanation of w (no MathJax needed)
+  // const note = document.createElement("p");
+  // note.style.fontSize = "14px";
+  // note.style.marginTop = "6px";
+  // note.textContent =
+  //   "Here w = 0.5, w ∈ [0, 1] controls how much weight we give to past, decayed risk " +
+  //   "versus the current year (w = 0 → only this year, w = 1 → only history).";
+  // box.appendChild(note);
+}
+
+// Writeup card: full detailed math
+async function renderDetailedFormulas(formulas) {
+  const container = document.getElementById("risk-math");
+  if (!container) {
+    console.warn("[risk_profile] #risk-math not found; skipping detailed formulas");
+    return;
+  }
+  container.innerHTML = "";
+
+  // intro text
+  const intro = document.createElement("p");
+  intro.textContent =
+    "We assign each disaster a human-impact score and an economic-impact score, " +
+    "aggregate them to per-capita burdens for each prefecture–year, normalize " +
+    "those burdens across the full 1960–2018 panel, then blend current-year and " +
+    "decayed historical risk into a single index.";
+  container.appendChild(intro);
+
+  // helper: inline math inside <li>
+  async function addBullet(label, latex) {
+    const li = document.createElement("li");
+    const b = document.createElement("b");
+    b.textContent = label + " ";
+    li.appendChild(b);
+
+    if (latex && window.MathJax && MathJax.tex2svgPromise) {
+      try {
+        const svg = await MathJax.tex2svgPromise(latex, { display: false });
+        li.appendChild(svg);
+      } catch (err) {
+        console.error("[risk_profile] MathJax bullet error", err, latex);
+        const span = document.createElement("span");
+        span.textContent = latex;
+        li.appendChild(span);
+      }
+    } else if (latex) {
+      const span = document.createElement("span");
+      span.textContent = latex;
+      li.appendChild(span);
+    }
+
+    return li;
+  }
+
+  const ul = document.createElement("ul");
+  ul.style.marginBottom = "10px";
+
+  if (formulas?.human_event?.latex) {
+    ul.appendChild(await addBullet("Event (human):", formulas.human_event.latex));
+  }
+  if (formulas?.econ_event?.latex) {
+    ul.appendChild(await addBullet("Event (economic):", formulas.econ_event.latex));
+  }
+  if (formulas?.risk_pref_year?.latex) {
+    ul.appendChild(await addBullet("Prefecture-year risk:", formulas.risk_pref_year.latex));
+  }
+
+  container.appendChild(ul);
+
+  // helper: display block
+  async function addDisplayHeading(headingText, latex) {
+    const h = document.createElement("h4");
+    h.textContent = headingText;
+    container.appendChild(h);
 
     if (latex && window.MathJax && MathJax.tex2svgPromise) {
       try {
         const wrap = document.createElement("div");
+        wrap.style.marginBottom = "6px";
         const svg = await MathJax.tex2svgPromise(latex, { display: true });
         wrap.appendChild(svg);
-        box.appendChild(wrap);
+        container.appendChild(wrap);
       } catch (err) {
         console.error("[risk_profile] MathJax display error", err, latex);
       }
-    } else if (latex) {
-      const pre = document.createElement("pre");
-      pre.textContent = latex;
-      box.appendChild(pre);
     }
   }
 
-  // 1) Event-level formulas
-  await addInline("Event (human):",     formulas?.human_event?.latex);
-  await addInline("Event (economic):",  formulas?.econ_event?.latex);
-
-  // 2) Prefecture-year risk
-  await addInline("Prefecture-year risk:", formulas?.risk_pref_year?.latex);
-
-  // 3) Normalization block
+  // Normalization block
   if (formulas?.normalization?.latex) {
-    await addDisplay("Normalization & derived terms:", formulas.normalization.latex);
+    await addDisplayHeading("Normalization & derived terms", formulas.normalization.latex);
   }
 
-  // 4) Decay & blend block
+  // Decay & blend block
   if (formulas?.decay_blend?.latex) {
-    await addDisplay("Decay & blend:", formulas.decay_blend.latex);
+    await addDisplayHeading("Decay and blending over time", formulas.decay_blend.latex);
   }
 
-  // 5) Optional notes as plain text (no LaTeX)
+  // Notes as plain text
   if (formulas?.normalization?.notes) {
-    const ul = document.createElement("ul");
-    for (const text of Object.values(formulas.normalization.notes)) {
+    const notesHead = document.createElement("h4");
+    notesHead.textContent = "Notes";
+    container.appendChild(notesHead);
+
+    const ulNotes = document.createElement("ul");
+    for (const text of Object.values(formulas.normalization.notes).slice(2)) {
       const li = document.createElement("li");
       li.textContent = text;
-      ul.appendChild(li);
+      ulNotes.appendChild(li);
     }
-    box.appendChild(ul);
+    const li = document.createElement("li");
+    li.textContent =
+    "Here w = 0.5, w ∈ [0, 1] controls how much weight we give to past, decayed risk " +
+    "versus the current year (w = 0 → only this year, w = 1 → only history).";
+    ulNotes.appendChild(li);
+    container.appendChild(ulNotes);
   }
 }
 
@@ -697,7 +770,9 @@ function bindClicks() {
     try {
       const j = await d3.json(JSON_URL);
       await waitForMathJax();                 // <-- ensure MathJax is ready
-      await drawFormulas(j?.formulas || {});  // <-- await the async function
+      const formulas = j?.formulas || {};
+      await drawFormulas(formulas);                 // sidebar (quick view)
+      await renderDetailedFormulas(formulas);       // writeup card (full view)
     } catch (e) {
       console.error("[risk_profile] error loading formulas JSON:", e);
     }
