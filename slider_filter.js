@@ -37,14 +37,15 @@ const paletteDefault = {
 };
 
 // High-contrast preset
+
 const paletteHighContrast = {
-  'drought': '#D4A017',          // bold blue
-  'earthquake': '#7B3F00',       // vivid red
-  'extreme temperature': '#FF7F00', // strong orange
-  'flood': '#005AB5',            // teal
-  'landslide': '#2CA02C',        // green
-  'storm': '#8A2BE2',            // violet
-  'volcanic activity': '#DC3220' // black
+  "drought":            '#0072B2', // blue
+  "earthquake":         '#009E73', // green
+  "extreme temperature":'#FF7F00', // gold yellow (never greys)
+  "flood":              '#56B4E9', // light blue
+  "landslide":          '#F0E442', // lemon yellow
+  "storm":              '#CC79A7', // magenta
+  "volcanic activity":  '#76B7B2'  // teal
 };
 
 // Active palette (start with default)
@@ -164,6 +165,7 @@ function renderDisasterPoints(year) {
       .attr('r', 0)
       .attr('fill', d => disasterColor(d.disaster_type_gdis))
       .attr('stroke', d => d3.color(disasterColor(d.disaster_type_gdis)).darker(1))
+      .attr('stroke', '#FFFFFF')
       .attr('stroke-width', 0.6)
       .attr('opacity', 0)
       .style('cursor', 'pointer')
