@@ -55,10 +55,11 @@ function attachPrefectureHandlers() {
 
 	const prefTooltip = d3.select('#' + prefTipId);
 
-	// Track the last pointer position so other scripts (like autoplay) can ask
+	// Track the last pointer position and clicked prefecture so other scripts (like autoplay) can ask
 	// the tooltip to show for whatever is currently under the cursor.
 	window.__prefLastPointer = null;
 	window.__prefHoveredEl = null;
+	window.__prefClickedEl = null; // Track clicked prefecture for persistent tooltip
 	document.addEventListener('pointermove', (e) => {
 		window.__prefLastPointer = { clientX: e.clientX, clientY: e.clientY, pageX: e.pageX, pageY: e.pageY };
 	});
@@ -270,6 +271,8 @@ function attachPrefectureHandlers() {
 			d3.select('body').classed(DISABLE_CLASS, true);
 			// Center each statistic line individually. Use simple centered divs
 			// with a bullet character so each line is horizontally centered.
+			const isClicked = (window.__prefClickedEl === prefNode);
+			const clickIndicator = isClicked ? ' (Click to unpin)' : '';
 			const statsHtml = `
 					<div style="margin-top:6px;color:#ffd">
 						<div style="text-align:center;margin:6px 0">• Affected: ${fmt.format(totalAffected)}</div>
@@ -280,7 +283,7 @@ function attachPrefectureHandlers() {
 						<div style="text-align:center;margin:6px 0">• Year: ${yearRangeText}</div>
 						<div style="text-align:center;margin:6px 0">• Disasters: ${eventCount}</div>
 					</div>`;
-			prefTooltip.html(`<strong>${title}</strong>${statsHtml}`).style('display', 'block');
+			prefTooltip.html(`<strong>${title}${clickIndicator}</strong>${statsHtml}`).style('display', 'block');
 		}
 	}
 
@@ -297,6 +300,17 @@ function attachPrefectureHandlers() {
 	prefs
 		.on(enter + '.prefTooltip', function (event, d) {
 			computeAndShow(this, event, d);
+		})
+		.on('click.prefTooltip', function (event, d) {
+			// Toggle clicked state: if already clicked, unpin it; otherwise set as new clicked prefecture
+			if (window.__prefClickedEl === this) {
+				window.__prefClickedEl = null;
+				d3.select('body').classed(DISABLE_CLASS, false);
+				prefTooltip.style('display', 'none');
+			} else {
+				window.__prefClickedEl = this;
+				computeAndShow(this, event, d);
+			}
 		})
 		.on(move + '.prefTooltip', function (event) {
 			// position tooltip near pointer, keep inside viewport
@@ -317,9 +331,11 @@ function attachPrefectureHandlers() {
 			prefTooltip.style('left', left + 'px').style('top', top + 'px');
 		})
 		.on(leave + '.prefTooltip', function () {
-			// restore global tooltip behavior and hide our tooltip
-			d3.select('body').classed(DISABLE_CLASS, false);
-			prefTooltip.style('display', 'none');
+			// Only hide tooltip if this prefecture is not currently clicked
+			if (window.__prefClickedEl !== this) {
+				d3.select('body').classed(DISABLE_CLASS, false);
+				prefTooltip.style('display', 'none');
+			}
 		});
 }
 

@@ -19,10 +19,14 @@
   <script src="slider_filter.js" type="module" defer></script>
   <script src="prefecture_tooltip.js" type="module" defer></script>
 
-  <!-- MathJax for LaTeX (lightweight async load) -->
+  <!-- MathJax (SVG only) -->
   <script>
     window.MathJax = {
-      tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
+      tex: {
+        packages: { '[+]': ['ams', 'text', 'textmacros'] },
+        inlineMath: [['\\(', '\\)']],
+        displayMath: [['\\[', '\\]']]
+      },
       svg: { fontCache: 'global' }
     };
   </script>
@@ -43,13 +47,12 @@
     <!-- Controls + Filters (keeps your IDs intact) -->
     <section id="controls-row" class="card">
       <div class="control">
-        <label for="myRange">Year</label>
+        <label for="myRange" id="demo">Year</label>
         <div class="control-inline">
           <button id="prevButton" type="button" class="btn">Prev</button>
           <input type="range" min="1960" max="2018" value="1960" class="slider" id="myRange" />
           <button id="nextButton" type="button" class="btn">Next</button>
           <button id="autoplay" type="button" class="btn">Play</button>
-          <span class="year-pill">Year: <strong id="demo">1960</strong></span>
         </div>
       </div>
 
@@ -178,6 +181,9 @@
 
         </p>
     </section>
+
+    <!-- <div id="mj-test">\( \text{human\_burden},\; \text{econ\_burden},\; \text{damage}_{\$,\,\text{final}} \)</div> -->
+
   </div>
 
   <!-- Tooltip for D3 (same class name you had before) -->
