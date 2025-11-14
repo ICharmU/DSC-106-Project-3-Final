@@ -445,22 +445,121 @@ function renderDetail(prefRawName) {
 }
 
 /** ---------- FORMULAS (LaTeX) ---------- **/
-function drawFormulas(formulas) {
-  d3.select("#formula-box").remove();
-  const box = d3.select("#detail-container").append("div").attr("id", "formula-box");
-  const human = formulas?.human_event?.latex || "";
-  const econ  = formulas?.econ_event?.latex || "";
-  const risk  = formulas?.risk_pref_year?.latex || "";
-  const decay = formulas?.decay_blend?.latex || "";
-  box.html(`
-    <h3>Current risk definitions</h3>
-    <div>Event (human): \\(${human}\\)</div>
-    <div>Event (economic): \\(${econ}\\)</div>
-    <div>Prefecture-year risk: \\(${risk}\\)</div>
-    <div>Decay & blend: \\(${decay}\\)</div>
-  `);
-  if (window.MathJax?.typesetPromise) window.MathJax.typesetPromise([box.node()]);
+
+async function waitForMathJax() {
+  if (window.MathJax && MathJax.tex2svgPromise) return;
+
+  await new Promise(resolve => {
+    const id = setInterval(() => {
+      if (window.MathJax && MathJax.tex2svgPromise) {
+        clearInterval(id);
+        resolve();
+      }
+    }, 30);
+  });
 }
+
+async function drawFormulas(formulas) {
+  // Remove any existing box
+  const old = document.getElementById("formula-box");
+  if (old) old.remove();
+
+  const detail = document.getElementById("detail-container");
+  if (!detail) {
+    console.warn("[risk_profile] #detail-container not found; skipping formulas");
+    return;
+  }
+
+  // Create the container div
+  const box = document.createElement("div");
+  box.id = "formula-box";
+  box.style.lineHeight = "1.25";
+  detail.appendChild(box);
+
+  // Title
+  const title = document.createElement("h3");
+  title.textContent = "Risk Profile Formulae";
+  box.appendChild(title);
+
+  // Helper: inline math row
+  async function addInline(label, latex) {
+    const row = document.createElement("div");
+
+    const b = document.createElement("b");
+    b.textContent = label + " ";
+    row.appendChild(b);
+
+    if (latex && window.MathJax && MathJax.tex2svgPromise) {
+      try {
+        const svg = await MathJax.tex2svgPromise(latex, { display: false });
+        row.appendChild(svg);
+      } catch (err) {
+        console.error("[risk_profile] MathJax inline error", err, latex);
+        const span = document.createElement("span");
+        span.textContent = latex;
+        row.appendChild(span);
+      }
+    } else {
+      // Fallback: show raw text
+      const span = document.createElement("span");
+      span.textContent = latex || "(not specified)";
+      row.appendChild(span);
+    }
+
+    box.appendChild(row);
+  }
+
+  // Helper: block display math
+  async function addDisplay(label, latex) {
+    const header = document.createElement("b");
+    header.textContent = label;
+    box.appendChild(header);
+
+    if (latex && window.MathJax && MathJax.tex2svgPromise) {
+      try {
+        const wrap = document.createElement("div");
+        const svg = await MathJax.tex2svgPromise(latex, { display: true });
+        wrap.appendChild(svg);
+        box.appendChild(wrap);
+      } catch (err) {
+        console.error("[risk_profile] MathJax display error", err, latex);
+      }
+    } else if (latex) {
+      const pre = document.createElement("pre");
+      pre.textContent = latex;
+      box.appendChild(pre);
+    }
+  }
+
+  // 1) Event-level formulas
+  await addInline("Event (human):",     formulas?.human_event?.latex);
+  await addInline("Event (economic):",  formulas?.econ_event?.latex);
+
+  // 2) Prefecture-year risk
+  await addInline("Prefecture-year risk:", formulas?.risk_pref_year?.latex);
+
+  // 3) Normalization block
+  if (formulas?.normalization?.latex) {
+    await addDisplay("Normalization & derived terms:", formulas.normalization.latex);
+  }
+
+  // 4) Decay & blend block
+  if (formulas?.decay_blend?.latex) {
+    await addDisplay("Decay & blend:", formulas.decay_blend.latex);
+  }
+
+  // 5) Optional notes as plain text (no LaTeX)
+  if (formulas?.normalization?.notes) {
+    const ul = document.createElement("ul");
+    for (const text of Object.values(formulas.normalization.notes)) {
+      const li = document.createElement("li");
+      li.textContent = text;
+      ul.appendChild(li);
+    }
+    box.appendChild(ul);
+  }
+}
+
 
 /** ---------- YEAR CHANGES ---------- **/
 function hookYearChanges() {
@@ -594,12 +693,13 @@ function bindClicks() {
     console.log(`[risk_profile] year ${y}: ${have}/${total} prefectures joined`);
     })();
 
-    // formulas come from JSON payload emitted by your notebook
+    // formulas come from JSON
     try {
       const j = await d3.json(JSON_URL);
-      drawFormulas(j?.formulas || {});
+      await waitForMathJax();                 // <-- ensure MathJax is ready
+      await drawFormulas(j?.formulas || {});  // <-- await the async function
     } catch (e) {
-      // ignore if JSON already loaded above
+      console.error("[risk_profile] error loading formulas JSON:", e);
     }
 
     // bind clicks and year changes

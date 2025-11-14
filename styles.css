@@ -423,16 +423,73 @@ body.pref-hover-active .pref:not(.hovered) {
     margin-top: 8px;
 }
 
+/* Right column that contains detail chart + formulas */
+#detail-container {
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+    /* allow children to shrink */
+}
+
+/* Chart stays its natural height */
+#detail-svg {
+    flex: 0 0 auto;
+}
+
+/* Right column card should be tall enough to allow the formula to stretch */
+#detail-container.card {
+    display: flex;
+    flex-direction: column;
+    min-height: 460px;
+    /* adjust if you want more/less */
+}
+
+/* Chart keeps natural height */
+#detail-svg {
+    flex: 0 0 auto;
+}
+
+/* Formula card takes remaining space and scrolls */
 #formula-box {
-    margin-top: 10px;
-    padding: 10px;
-    background: #fafafa;
-    border: 1px solid var(--rule);
-    border-radius: 8px;
-    font-size: 13px;
+    flex: 1 1 auto;
+    /* fill down to bottom */
+    overflow: auto;
+    /* internal scroll */
+    max-height: none;
+    /* don't clamp */
+    padding: 8px 10px;
+    border: 1px solid var(--border, #e5e7eb);
+    border-radius: 6px;
+    background: #fff;
+}
+
+/* Optional: tighter math to reduce line-wrap */
+#formula-box mjx-container {
+    line-height: 1.25;
 }
 
 #formula-box h3 {
     margin: 0 0 6px;
     font-size: 14px;
+}
+
+/* MathJax CHTML: allow wrapping when possible */
+#formula-box .mjx-chtml {
+    white-space: normal;
+    /* let long lines wrap */
+    line-height: 1.25;
+}
+
+/* small cosmetic bits */
+#formula-box h3 {
+    margin: 0 0 6px 0;
+    font-size: 14px;
+}
+
+#formula-box>div {
+    margin-bottom: 6px;
+}
+
+#formula-box b {
+    font-weight: 600;
 }

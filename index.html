@@ -19,10 +19,14 @@
   <script src="slider_filter.js" type="module" defer></script>
   <script src="prefecture_tooltip.js" type="module" defer></script>
 
-  <!-- MathJax for LaTeX (lightweight async load) -->
+  <!-- MathJax (SVG only) -->
   <script>
     window.MathJax = {
-      tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
+      tex: {
+        packages: { '[+]': ['ams', 'text', 'textmacros'] },
+        inlineMath: [['\\(', '\\)']],
+        displayMath: [['\\[', '\\]']]
+      },
       svg: { fontCache: 'global' }
     };
   </script>
@@ -139,6 +143,9 @@
         <li>Map is responsive via SVG viewBox; detail view updates on prefecture click.</li>
       </ul> -->
     </section>
+
+    <!-- <div id="mj-test">\( \text{human\_burden},\; \text{econ\_burden},\; \text{damage}_{\$,\,\text{final}} \)</div> -->
+
   </div>
 
   <!-- Tooltip for D3 (same class name you had before) -->
